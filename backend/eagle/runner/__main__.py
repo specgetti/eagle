@@ -6,17 +6,25 @@ the result. See eagle.executors.base.build_run_spec for its shape.
 """
 
 import base64
+import contextlib
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
 from typing import Any
 
-from eagle.runner.parse import AgentOutputError, parse_agent_output, parse_review
+from eagle.runner.parse import (
+    AgentOutputError,
+    find_claude_result,
+    parse_agent_output,
+    parse_review,
+)
+from eagle.runner.progress import Progress, describe_claude_event, redact
 
 DEFAULT_SPEC_PATH = "/var/run/eagle/spec.json"
 OUTPUT_TAIL = 4000
@@ -51,11 +59,7 @@ def _expand(value: Any, home: Path) -> Any:
     return value
 
 
-def _redact(text: str, secrets: list[str]) -> str:
-    for secret in secrets:
-        if secret and len(secret) >= 6:
-            text = text.replace(secret, "***")
-    return text
+_redact = redact
 
 
 def _git(args: list[str], cwd: Path, env: dict[str, str]) -> str:
@@ -94,11 +98,79 @@ def checkout(repo: dict[str, Any], workdir: Path, home: Path) -> str:
     return _git(["rev-parse", "HEAD"], workdir, env)
 
 
-def run(spec: dict[str, Any]) -> dict[str, Any]:
+def run_agent(
+    argv: list[str],
+    stdin: str | None,
+    cwd: Path,
+    env: dict[str, str],
+    timeout: float,
+    on_line: Any,
+) -> tuple[int, str, str]:
+    """Run the agent CLI, calling on_line(stream, line) for each line as it arrives.
+
+    Returns (exit code, stdout, stderr). Raises subprocess.TimeoutExpired after
+    killing the process, and FileNotFoundError if the CLI is missing.
+    """
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+        env=env,
+        text=True,
+        bufsize=1,
+    )
+    captured: dict[str, list[str]] = {"stdout": [], "stderr": []}
+
+    def pump(name: str, stream: Any) -> None:
+        for line in stream:
+            captured[name].append(line)
+            # Progress output must never break a run.
+            with contextlib.suppress(Exception):
+                on_line(name, line.rstrip("\n"))
+
+    def feed() -> None:
+        try:
+            assert proc.stdin is not None
+            proc.stdin.write(stdin or "")
+            proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+
+    threads = [
+        threading.Thread(target=pump, args=("stdout", proc.stdout), daemon=True),
+        threading.Thread(target=pump, args=("stderr", proc.stderr), daemon=True),
+    ]
+    if stdin is not None:
+        threads.append(threading.Thread(target=feed, daemon=True))
+    for thread in threads:
+        thread.start()
+    try:
+        returncode = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        raise
+    finally:
+        for thread in threads:
+            thread.join(timeout=10)
+    return returncode, "".join(captured["stdout"]), "".join(captured["stderr"])
+
+
+def _agent_model(argv: list[str], env: dict[str, str]) -> str | None:
+    for flag in ("--model", "-m"):
+        if flag in argv[:-1]:
+            return argv[argv.index(flag) + 1]
+    return env.get("ANTHROPIC_MODEL")
+
+
+def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any]:
     invocation = spec["invocation"]
     secrets = [v for v in invocation.get("env", {}).values() if isinstance(v, str)]
     if spec["repo"].get("token"):
         secrets.append(spec["repo"]["token"])
+    progress = progress or Progress(secrets)
 
     with tempfile.TemporaryDirectory(prefix="eagle-run-") as tmp:
         home = Path(tmp) / "home"
@@ -112,44 +184,56 @@ def run(spec: dict[str, Any]) -> dict[str, Any]:
             target.write_text(_expand(content, home))
             target.chmod(0o600)
 
+        repo = spec["repo"]
+        progress.log(f"checking out pull request {repo.get('pr_number')} of {repo['clone_url']}")
         try:
-            head_sha = checkout(spec["repo"], workdir, home)
+            head_sha = checkout(repo, workdir, home)
         except (RunError, subprocess.TimeoutExpired) as exc:
+            progress.log(f"checkout failed: {exc}")
             return _failed(_redact(f"Checkout failed: {exc}", secrets))
+        progress.log(f"checked out {head_sha}")
 
         env = {k: os.environ[k] for k in PASSTHROUGH_ENV if k in os.environ}
         env |= {"HOME": str(home), "GIT_TERMINAL_PROMPT": "0", "CI": "1"}
         env |= _expand(invocation.get("env", {}), home)
         argv = _expand(invocation["argv"], home)
+        output_kind = invocation.get("output", "stdout")
+        timeout = spec.get("timeout_seconds", 1800)
 
+        def on_line(stream: str, line: str) -> None:
+            if stream == "stdout" and output_kind == "claude_json":
+                for message in describe_claude_event(line):
+                    progress.log(message)
+            else:
+                progress.log(f"{argv[0]}: {line}")
+
+        model = _agent_model(argv, env)
+        progress.log(f"starting {argv[0]}" + (f" with model {model}" if model else ""))
         try:
-            proc = subprocess.run(
-                argv,
-                input=invocation.get("stdin"),
-                cwd=workdir,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=spec.get("timeout_seconds", 1800),
+            returncode, stdout, stderr = run_agent(
+                argv, invocation.get("stdin"), workdir, env, timeout, on_line
             )
         except FileNotFoundError:
+            progress.log(f"agent CLI not found: {argv[0]}")
             return _failed(f"Agent CLI not found: {argv[0]}")
         except subprocess.TimeoutExpired:
+            progress.log(f"agent timed out after {timeout}s")
             return _failed(f"Agent timed out after {spec.get('timeout_seconds')}s")
+        progress.log(f"{argv[0]} exited with code {returncode}")
 
-        if proc.returncode != 0:
-            detail = _failure_detail(invocation.get("output"), proc.stdout, proc.stderr)
-            return _failed(_redact(f"Agent exited with code {proc.returncode}: {detail}", secrets))
+        if returncode != 0:
+            detail = _failure_detail(output_kind, stdout, stderr)
+            return _failed(_redact(f"Agent exited with code {returncode}: {detail}", secrets))
 
         try:
             output = parse_agent_output(
-                invocation.get("output", "stdout"),
-                proc.stdout,
-                _expand(invocation.get("output_file"), home),
+                output_kind, stdout, _expand(invocation.get("output_file"), home)
             )
             review = parse_review(output.text)
         except AgentOutputError as exc:
+            progress.log(str(exc))
             return _failed(_redact(str(exc), secrets))
+        progress.log(f"review parsed: verdict {review.verdict or 'none'}")
 
         return {
             "status": "succeeded",
@@ -165,14 +249,12 @@ def run(spec: dict[str, Any]) -> dict[str, Any]:
 def _failure_detail(output_kind: str | None, stdout: str, stderr: str) -> str:
     """The most useful part of a failed agent run's output.
 
-    Claude Code in JSON mode reports errors (bad key, unknown model, API outage)
-    in the `result` field of its JSON on stdout, which is otherwise a long blob.
+    Claude Code reports errors (bad key, unknown model, API outage) in the
+    `result` field of its final JSON event on stdout, which is otherwise a long
+    stream of events.
     """
     if output_kind == "claude_json":
-        try:
-            data = json.loads(stdout.strip().splitlines()[-1])
-        except (json.JSONDecodeError, IndexError):
-            data = None
+        data = find_claude_result(stdout)
         if isinstance(data, dict) and data.get("result"):
             status = data.get("api_error_status")
             return str(data["result"]) + (f" (HTTP {status})" if status else "")

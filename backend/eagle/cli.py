@@ -29,10 +29,11 @@ def _read_password(from_stdin: bool, generate: bool) -> tuple[str, bool]:
 
 
 async def _migrate() -> None:
-    from eagle.migrate import upgrade_database
+    from eagle.migrate import upgrade_database, wait_for_database
 
     db = Database(get_settings().database_url)
     try:
+        await wait_for_database(db.engine)
         await upgrade_database(db.engine)
     finally:
         await db.dispose()
@@ -122,6 +123,10 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # One INFO line per HTTP request (the worker checks every review Job every
+    # few seconds) buries the lines that matter.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     match args.command:
         case "migrate":

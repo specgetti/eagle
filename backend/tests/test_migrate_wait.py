@@ -3,7 +3,13 @@
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from eagle.migrate import current_revision, head_revision, upgrade_database, wait_for_schema
+from eagle.migrate import (
+    current_revision,
+    head_revision,
+    upgrade_database,
+    wait_for_database,
+    wait_for_schema,
+)
 
 
 @pytest.fixture
@@ -61,4 +67,44 @@ async def test_unreachable_database_is_retried_not_fatal(tmp_path):
     with pytest.raises(RuntimeError, match="unreachable"):
         await wait_for_schema(eng, timeout=2, interval=1, sleep=sleep)
     assert attempts == 2
+    await eng.dispose()
+
+
+async def test_wait_for_database_returns_when_reachable(engine):
+    sleeps: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    await wait_for_database(engine, sleep=sleep)
+    assert sleeps == []
+
+
+async def test_wait_for_database_retries_until_it_is_up(tmp_path, caplog):
+    # The database "starts" (its directory appears) after two failed attempts.
+    folder = tmp_path / "later"
+    eng = create_async_engine(f"sqlite+aiosqlite:///{folder / 'x.db'}")
+    attempts = 0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            folder.mkdir()
+
+    caplog.set_level("INFO", logger="eagle.migrate")
+    await wait_for_database(eng, interval=1, sleep=sleep)
+    assert attempts == 2
+    assert "Waiting for the database" in caplog.text
+    await eng.dispose()
+
+
+async def test_wait_for_database_times_out(tmp_path):
+    eng = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'missing' / 'x.db'}")
+
+    async def sleep(seconds: float) -> None:
+        pass
+
+    with pytest.raises(RuntimeError, match="not reachable after 2s"):
+        await wait_for_database(eng, timeout=2, interval=1, sleep=sleep)
     await eng.dispose()

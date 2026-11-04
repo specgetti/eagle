@@ -81,12 +81,18 @@ Or push to a moving tag such as `:latest` and let `registryPoll` pick it up.
 ### 3. Install from the console
 
 1. **Operators > OperatorHub**, search for **Eagle**, click **Install**. Keep
-   "All namespaces" and the `alpha` channel. Automatic update approval upgrades
-   the operator when the catalog gets a new version; instances that use the
-   default images then roll to the new release on their own.
+   "All namespaces" and the `alpha` channel. **Installed Namespace** is where
+   the operator pod runs (`openshift-operators` by default), not Eagle itself.
+   Automatic update approval upgrades the operator when the catalog gets a new
+   version; instances that use the default images then roll to the new
+   release on their own.
 2. Create a project for Eagle, for example `eagle`.
-3. **Operators > Installed Operators > Eagle > Review Platform > Create**. The
-   form groups the settings; every field is optional:
+3. Switch the console's **Project** selector to that project, then **Operators >
+   Installed Operators > Eagle > Review Platform > Create**. The form creates
+   the instance in the selected project, so with the operator's project still
+   selected Eagle lands next to the operator. Any Secret the form refers to
+   (such as the admin password) must be in the same project. The form groups
+   the settings; every field is optional:
    - **First admin account**: pick a Secret with the admin password, or leave
      empty and read the generated password from the `eagle-web` pod log.
    - **External access**: set a fixed host name if you plan to enable SSO.
@@ -100,6 +106,53 @@ Or push to a moving tag such as `:latest` and let `registryPoll` pick it up.
 
 Credentials, models, agents, GitHub tokens, notifications and users are then
 configured in Eagle's own admin pages, not in this form.
+
+### Troubleshooting the install
+
+- **Install spins with no progress, the Subscription has no status.** OLM
+  resolves every Subscription in a namespace together. If `openshift-operators`
+  already holds an InstallPlan waiting for manual approval (another operator
+  set to Manual), no new plan is made there, Eagle's included. Check with
+  `oc get installplan -n openshift-operators`. Rather than approving someone
+  else's upgrades, install Eagle's operator into its own namespace:
+
+  ```bash
+  oc delete subscription eagle-operator -n openshift-operators --ignore-not-found
+  oc create namespace eagle-operator
+  oc apply -f - <<'EOF'
+  apiVersion: operators.coreos.com/v1
+  kind: OperatorGroup
+  metadata:
+    name: eagle-operator
+    namespace: eagle-operator
+  spec: {}            # no target namespaces: watches all namespaces
+  ---
+  apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: eagle-operator
+    namespace: eagle-operator
+  spec:
+    channel: alpha
+    name: eagle-operator
+    source: eagle-catalog
+    sourceNamespace: openshift-marketplace
+    installPlanApproval: Automatic
+  EOF
+  oc get csv -n eagle-operator -w     # wait for eagle-operator.v... Succeeded
+  ```
+
+  `oc get csv -n eagle-operator` also lists the other cluster wide operators:
+  OLM copies their CSVs into every namespace for display. Only Eagle runs there.
+- **Pods stop with `CreateContainerConfigError`, "secret ... not found".** The
+  ReviewPlatform is in a different project than the Secret it refers to (see
+  step 3). Delete it and create it in the Secret's project; the operator keeps
+  `eagle-keys`, `eagle-db`, `eagle-database-url` and the `data-eagle-db-0` PVC
+  on purpose, so delete those too if the misplaced instance has no data.
+- **A review pod's log.** `oc logs -n eagle -f -l eagle.redhat.com/review-id=<id>`
+  (or `-l app.kubernetes.io/component=eagle-runner` for all of them) shows the checkout, the agent and model, every tool the agent calls and the
+  verdict as the review runs. The worker logs one line per finished review:
+  `oc logs -n eagle deploy/eagle-worker | grep Review`.
 
 ### Test locally first
 

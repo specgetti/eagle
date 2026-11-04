@@ -25,7 +25,7 @@ def test_claude_api_key():
         cred(CredentialKind.ANTHROPIC_API_KEY, {"api_key": "k"}, {"base_url": "https://gw"}),
         "PROMPT",
     )
-    assert inv.argv[:4] == ["claude", "-p", "--output-format", "json"]
+    assert inv.argv[:5] == ["claude", "-p", "--output-format", "stream-json", "--verbose"]
     assert inv.argv[-2:] == ["--model", "claude-opus-5-5"]
     assert "Edit" in inv.argv[inv.argv.index("--disallowedTools") + 1]
     assert inv.env == {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "https://gw"}

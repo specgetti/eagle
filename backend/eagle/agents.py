@@ -74,8 +74,11 @@ def _claude(model: str | None, c: ResolvedCredential, prompt: str) -> AgentInvoc
     argv = [
         "claude",
         "-p",
+        # One JSON event per line: the runner logs progress from them and reads
+        # the final "result" event (same fields as `--output-format json`).
         "--output-format",
-        "json",
+        "stream-json",
+        "--verbose",
         "--allowedTools",
         CLAUDE_ALLOWED_TOOLS,
         "--disallowedTools",

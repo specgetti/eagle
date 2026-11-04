@@ -1,6 +1,7 @@
 """Runner tests. The end-to-end tests use a real local git repo (with a GitHub-style
 refs/pull/N/head ref) and fake agent CLIs on PATH that stand in for the model."""
 
+import io
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 
 from eagle.runner import __main__ as runner
 from eagle.runner.parse import AgentOutputError, parse_agent_output, parse_review
+from eagle.runner.progress import Progress, describe_claude_event
 from tests.fakes import FAKE_CLAUDE, make_fake_cli
 
 REVIEW_TEXT = """## Summary
@@ -316,3 +318,127 @@ def test_runner_failure_detail_falls_back_to_raw_output(pr_repo, tmp_path, fake_
     )
     result = runner.run(claude_spec(pr_repo, tmp_path))
     assert result["error"] == "Agent exited with code 2: boom: not json"
+
+
+# Progress log (what `oc logs` shows on a review pod)
+
+STREAM_EVENTS = [
+    {"type": "system", "subtype": "init", "model": "glm-5.3", "claude_code_version": "2.1.305"},
+    {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {"type": "text", "text": "Let me look at the diff."},
+                {"type": "tool_use", "name": "Bash", "input": {"command": "git diff main"}},
+                {"type": "tool_use", "name": "Grep", "input": {"pattern": "def ", "path": "src"}},
+            ]
+        },
+    },
+    {
+        "type": "user",
+        "message": {
+            "content": [
+                {"type": "tool_result", "is_error": True, "content": "File does not exist."},
+                {"type": "tool_result", "content": "fine"},
+            ]
+        },
+    },
+    {
+        "type": "result",
+        "is_error": False,
+        "result": REVIEW_TEXT,
+        "num_turns": 4,
+        "duration_ms": 61000,
+        "usage": {"input_tokens": 1000, "cache_read_input_tokens": 500, "output_tokens": 80},
+    },
+]
+
+
+def test_parse_claude_stream_json_uses_the_result_event():
+    stdout = "\n".join(json.dumps(e) for e in STREAM_EVENTS)
+    assert parse_agent_output("claude_json", stdout).text == REVIEW_TEXT
+
+
+def test_parse_claude_stream_without_result_event_fails():
+    stdout = "\n".join(json.dumps(e) for e in STREAM_EVENTS[:-1])
+    with pytest.raises(AgentOutputError, match="Could not parse"):
+        parse_agent_output("claude_json", stdout)
+
+
+def test_describe_claude_events():
+    lines = [line for e in STREAM_EVENTS for line in describe_claude_event(json.dumps(e))]
+    assert lines == [
+        "Claude Code 2.1.305 started: model glm-5.3",
+        "agent: Let me look at the diff.",
+        "tool Bash git diff main",
+        "tool Grep def  in src",
+        "tool error: File does not exist.",
+        "Claude Code finished: 4 turns, 61s, 1500 tokens in, 80 out",
+    ]
+    assert describe_claude_event("not json") == ["not json"]
+    assert describe_claude_event('{"type": "stream_event"}') == []
+
+
+def test_describe_claude_error_result():
+    event = {
+        "type": "result",
+        "is_error": True,
+        "result": "Invalid API key",
+        "api_error_status": 401,
+    }
+    assert describe_claude_event(json.dumps(event)) == [
+        "Claude Code failed: Invalid API key (HTTP 401)"
+    ]
+
+
+def test_progress_lines_are_redacted_single_line_and_bounded():
+    out = io.StringIO()
+    ticks = iter([0.0, 12.4, 13.0])
+    progress = Progress(["sk-secret-value"], out=out, clock=lambda: next(ticks))
+    progress.log("key sk-secret-value\nsecond line")
+    progress.log("x" * 1000)
+    lines = out.getvalue().splitlines()
+    assert lines[0] == "[   12s] key *** second line"
+    assert len(lines[1]) < 320 and lines[1].endswith("...")
+
+
+def test_runner_streams_progress_while_the_agent_runs(pr_repo, tmp_path, fake_bin):
+    make_fake_cli(
+        fake_bin,
+        "claude",
+        f"""
+import json, sys
+sys.stdin.read()
+events = {json.dumps(STREAM_EVENTS)!r}
+for event in json.loads(events):
+    print(json.dumps(event), flush=True)
+sys.stderr.write("warning: using sk-test-key-123\\n")
+""",
+    )
+    out = io.StringIO()
+    spec = claude_spec(pr_repo, tmp_path)
+    result = runner.run(spec, progress=Progress(["sk-test-key-123"], out=out))
+    assert result["status"] == "succeeded", result
+    log = out.getvalue()
+    for expected in (
+        "checking out pull request 7 of ",
+        f"checked out {pr_repo['head']}",
+        "starting claude with model m",
+        "Claude Code 2.1.305 started: model glm-5.3",
+        "tool Bash git diff main",
+        "claude: warning: using ***",
+        "claude exited with code 0",
+        "review parsed: verdict request_changes",
+    ):
+        assert expected in log, (expected, log)
+    assert "sk-test-key-123" not in log
+
+
+def test_runner_logs_plain_agent_output(pr_repo, tmp_path, fake_bin):
+    make_fake_cli(fake_bin, "opencode", "print('thinking about it')\nprint('VERDICT: approve')\n")
+    spec = claude_spec(pr_repo, tmp_path)
+    spec["invocation"] |= {"argv": ["opencode", "run", "PROMPT"], "stdin": None, "output": "stdout"}
+    out = io.StringIO()
+    result = runner.run(spec, progress=Progress([], out=out))
+    assert result["status"] == "succeeded", result
+    assert "opencode: thinking about it" in out.getvalue()

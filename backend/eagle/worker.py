@@ -268,6 +268,16 @@ class Worker:
                 logger.exception("Could not get status of review %s", review.id)
                 continue
 
+            if state.state in ("finished", "failed"):
+                elapsed = (now - started).total_seconds()
+                outcome = (state.result or {}).get("status") if state.state == "finished" else None
+                logger.info(
+                    "Review %s %s after %.0fs%s",
+                    review.id,
+                    outcome or state.state,
+                    elapsed,
+                    f": {state.error}" if state.error else "",
+                )
             async with self._sm() as db:
                 if state.state == "finished":
                     if state.result is not None:

@@ -7,6 +7,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -44,6 +45,34 @@ async def current_revision(engine: AsyncEngine) -> str | None:
         return await connection.run_sync(
             lambda sync: MigrationContext.configure(sync).get_current_revision()
         )
+
+
+async def wait_for_database(
+    engine: AsyncEngine,
+    timeout: float = 300,
+    interval: float = 3,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """Block until the database accepts connections.
+
+    On a fresh install the database pod starts at the same time as the web pod,
+    whose `eagle migrate` init container would otherwise fail and crash loop
+    until PostgreSQL is up.
+    """
+    waited = 0.0
+    while True:
+        try:
+            async with engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+            return
+        except (OSError, SQLAlchemyError) as exc:
+            if waited >= timeout:
+                raise RuntimeError(
+                    f"Database is not reachable after {timeout:.0f}s: {type(exc).__name__}"
+                ) from exc
+            logger.info("Waiting for the database (%s)", type(exc).__name__)
+        await sleep(interval)
+        waited += interval
 
 
 async def wait_for_schema(

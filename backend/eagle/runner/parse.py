@@ -42,21 +42,34 @@ def parse_agent_output(
     return AgentOutput(text=_ANSI.sub("", stdout))
 
 
-def _parse_claude(stdout: str) -> AgentOutput:
-    data = None
+def find_claude_result(stdout: str) -> dict[str, Any] | None:
+    """The final result object in Claude Code's output.
+
+    With `--output-format stream-json` that is the last event of type "result";
+    with `--output-format json` it is the single object printed (no "type", or
+    type "result"). Other events (init, assistant, user) are skipped.
+    """
     for line in reversed(stdout.strip().splitlines()):
         line = line.strip()
-        if line.startswith("{"):
-            try:
-                data = json.loads(line)
-                break
-            except json.JSONDecodeError:
-                continue
-    if data is None:
+        if not line.startswith("{"):
+            continue
         try:
-            data = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise AgentOutputError("Could not parse Claude Code JSON output") from exc
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("type", "result") == "result":
+            return data
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _parse_claude(stdout: str) -> AgentOutput:
+    data = find_claude_result(stdout)
+    if data is None:
+        raise AgentOutputError("Could not parse Claude Code JSON output")
     if data.get("is_error"):
         raise AgentOutputError(f"Claude Code reported an error: {data.get('result')}")
     if not isinstance(data.get("result"), str):
