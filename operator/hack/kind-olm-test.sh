@@ -52,6 +52,13 @@ api() { curl -sf -b "$COOKIES" -c "$COOKIES" -H 'Content-Type: application/json'
 json() { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)"; }
 diagnose() {
   echo "---- diagnostics"
+  echo "registry: $(curl -s "http://$REG/v2/_catalog")"
+  for image in eagle eagle-agent-runner eagle-operator eagle-operator-bundle; do
+    echo "  $image tags: $(curl -s "http://$REG/v2/$image/tags/list")"
+  done
+  $KCTL get csv,installplan,sub -n operators -o wide || true
+  $KCTL describe pods -n operators | sed -n '/^Name:/p;/Image:/p;/^Events:/,/^$/p' || true
+  $KCTL get events -A --sort-by=.lastTimestamp | grep -iE "pull|image|fail|error|backoff" | tail -20 || true
   $KCTL get rp,deploy,pods,jobs -n eagle -o wide || true
   $KCTL logs -n eagle deploy/eagle-worker --tail=40 || true
   $KCTL logs -n eagle -l app.kubernetes.io/component=eagle-runner --tail=40 || true
