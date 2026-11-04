@@ -105,8 +105,10 @@ configured in Eagle's own admin pages, not in this form.
 
 `operator/hack/kind-olm-test.sh` runs the same install on a local kind cluster
 with OLM (no OpenShift needed): it builds every image, publishes a catalog,
-installs through a Subscription, creates a ReviewPlatform and checks that it is
-Ready and serving. `--delete` removes the cluster and the local registry.
+installs through a Subscription, creates a ReviewPlatform, checks that it is
+Ready and serving, and runs a complete review with the Claude Code CLI against
+a fake model API. CI runs it too (`e2e` workflow, also before each release).
+`--delete` removes the cluster and the local registry.
 
 ---
 

@@ -140,7 +140,7 @@ not the generated CSV.
 | `make bundle-build bundle-push` | Build and push `BUNDLE_IMG` |
 | `make catalog` | Render a file based catalog for `BUNDLE_IMG` (needs it pushed). `PREVIOUS_VERSION=x.y.z` keeps that version and adds the upgrade edge. On macOS add `OPM_IN_CONTAINER=1` |
 | `make catalog-build catalog-push` | Build and push `CATALOG_IMG` |
-| `hack/kind-olm-test.sh` | Whole flow on a local kind cluster with OLM, then checks the instance is Ready and serving |
+| `hack/kind-olm-test.sh` | Whole flow on a kind cluster with OLM: install from a catalog, instance Ready, then a complete review Job (Claude Code CLI against `hack/fake-anthropic.py`). Run by the `e2e` workflow; `CONTAINER_TOOL=docker` or `podman` |
 
 `operator-sdk` and `opm` are downloaded into `bin/` at pinned versions
 (`OPERATOR_SDK_VERSION`, `OPM_VERSION`). `catalog/` and `catalog.Dockerfile`
@@ -257,7 +257,7 @@ config/manifests/         base ClusterServiceVersion and icon for the OLM bundle
 config/default/           kustomize entrypoint used by `make deploy`
 config/samples/           example ReviewPlatforms (the first is the console form's default)
 bundle/                   generated OLM bundle (make bundle)
-hack/                     kind test script, policy.json for opm in a container
+hack/                     kind e2e script, fake Anthropic API, policy.json for opm in a container
 ```
 
 ## Known limitations

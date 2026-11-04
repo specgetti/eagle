@@ -145,15 +145,24 @@ volume, so reinstalling with the same name keeps all data.
   secret values. Subscription credentials show a warning: sharing a personal
   subscription through a team service may conflict with provider terms.
 
-## Test locally before a cluster
+## Cluster test (CI and local)
+
+`operator/hack/kind-olm-test.sh` is the end to end test. On a kind cluster with
+OLM it builds every image, installs the operator from a catalog the way
+OperatorHub does, creates a ReviewPlatform, checks it is Ready and serving, then
+runs a real review: the actual Claude Code CLI, in a review Job, reviews
+`octocat/Hello-World#1` against a fake model API running in the cluster, and the
+review must finish with a verdict and clean up its Secret.
+
+CI runs it (`e2e` workflow) on changes to the operator, runner, backend code or
+Containerfiles, and before every release. To run it locally:
 
 ```bash
-operator/hack/kind-olm-test.sh            # kind + OLM: build, publish catalog, install, create an instance, smoke test
+operator/hack/kind-olm-test.sh            # podman (rootful machine on macOS); CONTAINER_TOOL=docker also works
 operator/hack/kind-olm-test.sh --delete   # clean up
 ```
 
-Needs podman (a rootful machine on macOS), kind, kubectl and Go. It runs the
-same OperatorHub install path as OpenShift, on your laptop.
+Needs kind, kubectl, Go and podman or docker.
 
 ## Development
 
@@ -190,14 +199,15 @@ fakes.
 | `agent-runner/` | Review pod image (git and the pinned agent CLIs) |
 | `operator/` | Go operator, `ReviewPlatform` CRD, OLM bundle, kind test script |
 | `deploy/` | Install guide and Kustomize manifests for installs without the operator |
-| `.github/workflows/` | `ci` (backend, frontend, images), `operator` (tests, bundle check), `release` (publish images) |
+| `.github/workflows/` | `ci` (backend, frontend, images), `operator` (tests, bundle check), `e2e` (kind cluster test), `release` (e2e, then publish images) |
 | `PLAN.md` | Design decisions, data model and security model |
 
 ## Status
 
-Tested: unit and integration suites; the operator against a real Kubernetes API
-server; and the full OperatorHub install, an upgrade, and a review Job on a
-local kind cluster with OLM.
+Tested in CI: unit and integration suites, the operator against a real
+Kubernetes API server, and the full OperatorHub install plus a complete review
+(real Claude Code CLI, fake model API) on a kind cluster with OLM. Operator
+upgrades through OLM were tested by hand on kind.
 
 Not yet verified: an OpenShift cluster (console form, Routes, random UIDs),
 reviews against real models (the agent CLI flags are pinned in

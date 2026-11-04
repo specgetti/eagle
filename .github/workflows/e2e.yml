@@ -1,0 +1,66 @@
+name: e2e
+
+# Full cluster test on kind with OLM (operator/hack/kind-olm-test.sh): install
+# the operator from a catalog, create a ReviewPlatform, and run a real review
+# with the Claude Code CLI against a fake model API. About 15 minutes, so it
+# only runs when something that ships to a cluster changes, and before releases.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - "operator/**"
+      - "agent-runner/**"
+      - "backend/eagle/**"
+      - "backend/pyproject.toml"
+      - "backend/uv.lock"
+      - "Containerfile"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "operator/**"
+      - "agent-runner/**"
+      - "backend/eagle/**"
+      - "backend/pyproject.toml"
+      - "backend/uv.lock"
+      - "Containerfile"
+      - ".github/workflows/e2e.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # github.workflow is the caller's name when run from release.yml, so a push
+  # to main never cancels the e2e run that gates a release (or the reverse).
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CONTAINER_TOOL: docker
+      KIND_VERSION: v0.33.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: operator/go.mod
+          cache-dependency-path: operator/go.sum
+
+      - name: Install kind
+        run: |
+          curl -sSfLo /usr/local/bin/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x /usr/local/bin/kind
+          kind version
+          kubectl version --client
+
+      - name: OperatorHub install and a real review on kind
+        env:
+          # Avoids GitHub's anonymous API rate limit when Eagle reads the test PR.
+          EAGLE_E2E_GITHUB_TOKEN: ${{ github.token }}
+        run: operator/hack/kind-olm-test.sh
