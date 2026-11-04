@@ -1,0 +1,6 @@
+# Input for `make bundle`: the operator deployment, RBAC, CRD and samples, plus
+# the base ClusterServiceVersion (console listing and form descriptors).
+resources:
+  - bases/eagle-operator.clusterserviceversion.yaml
+  - ../default
+  - ../samples

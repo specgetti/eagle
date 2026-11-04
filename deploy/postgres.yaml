@@ -1,0 +1,108 @@
+# Single replica Postgres using the RHEL image env. The PVC (data-eagle-db-0)
+# is retained when the StatefulSet is deleted.
+apiVersion: v1
+kind: Service
+metadata:
+  name: eagle-db
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-postgres
+    app.kubernetes.io/part-of: eagle
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: eagle-db
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-postgres
+    app.kubernetes.io/part-of: eagle
+spec:
+  replicas: 1
+  serviceName: eagle-db
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eagle
+      app.kubernetes.io/instance: eagle
+      app.kubernetes.io/component: eagle-postgres
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eagle
+        app.kubernetes.io/instance: eagle
+        app.kubernetes.io/component: eagle-postgres
+        app.kubernetes.io/part-of: eagle
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: registry.redhat.io/rhel9/postgresql-16:latest
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef: {name: eagle-db, key: POSTGRESQL_USER}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: eagle-db, key: POSTGRESQL_PASSWORD}
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef: {name: eagle-db, key: POSTGRESQL_DATABASE}
+          readinessProbe:
+            exec:
+              command: ["/usr/libexec/check-container"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/usr/libexec/check-container", "--live"]
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: eagle
+          app.kubernetes.io/instance: eagle
+          app.kubernetes.io/component: eagle-postgres
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        # storageClassName: gp3-csi
+        resources:
+          requests:
+            storage: 5Gi

@@ -1,0 +1,625 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: reviewplatforms.eagle.redhat.com
+spec:
+  group: eagle.redhat.com
+  names:
+    kind: ReviewPlatform
+    listKind: ReviewPlatformList
+    plural: reviewplatforms
+    shortNames:
+    - rp
+    singular: reviewplatform
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.url
+      name: URL
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ReviewPlatform is the Schema for the reviewplatforms API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ReviewPlatformSpec defines the desired state of ReviewPlatform.
+            properties:
+              bootstrapAdmin:
+                description: BootstrapAdmin configures the first admin account.
+                properties:
+                  passwordSecretRef:
+                    description: |-
+                      PasswordSecretRef holds the bootstrap admin password. When absent the
+                      app generates one and prints it to its log once.
+                    properties:
+                      key:
+                        description: Key in the Secret. Defaults to "password".
+                        type: string
+                      name:
+                        description: Name of the Secret.
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  username:
+                    default: admin
+                    description: Username of the bootstrap admin.
+                    type: string
+                type: object
+              database:
+                description: Database selects a managed or external Postgres.
+                properties:
+                  external:
+                    description: |-
+                      External database. Mutually exclusive with an enabled managed database.
+                      Turn off the built-in database when using this.
+                    properties:
+                      key:
+                        default: url
+                        description: Key in the Secret that holds the URL.
+                        type: string
+                      secretName:
+                        description: |-
+                          SecretName is the Secret holding the database URL
+                          (postgresql+asyncpg://user:pass@host:5432/db).
+                        minLength: 1
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  managed:
+                    description: Managed Postgres deployed by the operator. This is
+                      the default.
+                    properties:
+                      enabled:
+                        default: true
+                        description: Enabled deploys a single replica Postgres StatefulSet.
+                        type: boolean
+                      image:
+                        description: |-
+                          Image is the Postgres image. It must accept the RHEL postgresql image
+                          environment (POSTGRESQL_USER, POSTGRESQL_PASSWORD, POSTGRESQL_DATABASE).
+                          Empty uses the operator's default PostgreSQL image.
+                        type: string
+                      resources:
+                        description: Resources for the Postgres container.
+                        properties:
+                          claims:
+                            description: |-
+                              Claims lists the names of resources, defined in spec.resourceClaims,
+                              that are used by this container.
+
+                              This is an alpha field and requires enabling the
+                              DynamicResourceAllocation feature gate.
+
+                              This field is immutable. It can only be set for containers.
+                            items:
+                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name must match the name of one entry in pod.spec.resourceClaims of
+                                    the Pod where this field is used. It makes that resource available
+                                    inside a container.
+                                  type: string
+                                request:
+                                  description: |-
+                                    Request is the name chosen for a request in the referenced claim.
+                                    If empty, everything from the claim is made available, otherwise
+                                    only the result of this request.
+                                  type: string
+                              required:
+                              - name
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: |-
+                              Limits describes the maximum amount of compute resources allowed.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: |-
+                              Requests describes the minimum amount of compute resources required.
+                              If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                              otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                            type: object
+                        type: object
+                      storageClassName:
+                        description: StorageClassName for the data volume. Empty uses
+                          the cluster default.
+                        type: string
+                      storageSize:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 5Gi
+                        description: |-
+                          StorageSize of the data volume. Only applied when the StatefulSet is
+                          first created (volumeClaimTemplates are immutable).
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: 'database.managed and database.external are mutually exclusive:
+                    set managed.enabled=false or remove external'
+                  rule: '!(has(self.external) && has(self.managed) && (!has(self.managed.enabled)
+                    || self.managed.enabled))'
+                - message: database.external is required when database.managed.enabled
+                    is false
+                  rule: has(self.external) || !has(self.managed) || !has(self.managed.enabled)
+                    || self.managed.enabled
+              image:
+                description: |-
+                  Image is the Eagle application image shared by web and worker. Empty
+                  uses the operator's default image for this release.
+                type: string
+              imagePullPolicy:
+                description: ImagePullPolicy for the application and Postgres containers.
+                enum:
+                - Always
+                - IfNotPresent
+                - Never
+                type: string
+              replicas:
+                default: 1
+                description: Replicas of the web Deployment.
+                format: int32
+                minimum: 0
+                type: integer
+              resources:
+                description: Resources for the web and worker containers.
+                properties:
+                  web:
+                    description: Web container resources.
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  worker:
+                    description: Worker container resources.
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                type: object
+              route:
+                description: Route configures external access.
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled creates a Route for the web Service.
+                    type: boolean
+                  host:
+                    description: |-
+                      Host is the external host name. When empty OpenShift assigns one.
+                      When the Route is disabled, Host is still used to build EAGLE_PUBLIC_URL
+                      (for clusters that expose the web Service some other way).
+                      Set a fixed host if you plan to enable single sign-on, so the redirect
+                      URL registered with the identity provider does not change.
+                    type: string
+                  tls:
+                    description: TLS settings.
+                    properties:
+                      insecureEdgeTerminationPolicy:
+                        default: Redirect
+                        description: InsecureEdgeTerminationPolicy for plain HTTP
+                          requests.
+                        enum:
+                        - Redirect
+                        - None
+                        - Allow
+                        type: string
+                      termination:
+                        default: edge
+                        description: Termination type. Only edge is supported because
+                          the app serves plain HTTP.
+                        enum:
+                        - edge
+                        type: string
+                    type: object
+                type: object
+              runner:
+                description: Runner configures review Job pods.
+                properties:
+                  blockedCIDRs:
+                    default:
+                    - 10.0.0.0/8
+                    - 172.16.0.0/12
+                    - 192.168.0.0/16
+                    description: |-
+                      BlockedCIDRs are IPv4 ranges runner pods may not reach. All other IPv4
+                      egress is allowed so agents can reach GitHub and inference APIs.
+                      An empty or missing list means the defaults (RFC 1918 ranges).
+                      If a model endpoint (for example an internal MaaS) has a private address,
+                      remove its range here or reviews cannot reach it.
+                    items:
+                      type: string
+                    type: array
+                  image:
+                    description: |-
+                      Image is the agent runner image used for review Jobs. Empty uses the
+                      operator's default runner image. The operator only passes it to the
+                      worker via EAGLE_RUNNER_IMAGE.
+                    type: string
+                  resources:
+                    description: |-
+                      Resources for runner pods. Only limits.cpu and limits.memory are passed
+                      to the worker (EAGLE_RUNNER_CPU_LIMIT, EAGLE_RUNNER_MEMORY_LIMIT).
+                      Defaults: cpu "2", memory "4Gi".
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                type: object
+              secrets:
+                description: Secrets configures application key material.
+                properties:
+                  existingSecret:
+                    description: |-
+                      ExistingSecret holds EAGLE_SECRET_KEY and EAGLE_ENCRYPTION_KEY. When empty,
+                      the operator generates <name>-keys once and never modifies it afterwards.
+                      Only for restoring or moving an install: EAGLE_ENCRYPTION_KEY decrypts
+                      every credential stored in the database.
+                    type: string
+                type: object
+              sso:
+                description: SSO configures OpenID Connect login (web only).
+                properties:
+                  adminGroups:
+                    description: AdminGroups map to the admin role.
+                    items:
+                      type: string
+                    type: array
+                  buttonLabel:
+                    description: ButtonLabel shown on the login page.
+                    type: string
+                  clientId:
+                    description: ClientID registered with the provider.
+                    type: string
+                  clientSecretRef:
+                    description: ClientSecretRef holds the client secret. Key defaults
+                      to "clientSecret".
+                    properties:
+                      key:
+                        description: Key in the Secret. Defaults to "password".
+                        type: string
+                      name:
+                        description: Name of the Secret.
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  defaultRole:
+                    default: viewer
+                    description: DefaultRole for users in none of the mapped groups.
+                      "none" denies access.
+                    enum:
+                    - admin
+                    - member
+                    - viewer
+                    - none
+                    type: string
+                  groupsClaim:
+                    description: GroupsClaim is the ID token claim holding the user's
+                      groups.
+                    type: string
+                  issuer:
+                    description: |-
+                      Issuer URL of the OIDC provider. SSO is enabled only when both issuer
+                      and clientId are set.
+                    type: string
+                  localLoginEnabled:
+                    default: true
+                    description: LocalLoginEnabled keeps username/password login available
+                      (break glass).
+                    type: boolean
+                  memberGroups:
+                    description: MemberGroups map to the member role.
+                    items:
+                      type: string
+                    type: array
+                  scopes:
+                    default: openid email profile
+                    description: Scopes requested, space separated.
+                    type: string
+                  usernameClaim:
+                    description: UsernameClaim is the ID token claim used as the username.
+                    type: string
+                  viewerGroups:
+                    description: ViewerGroups map to the viewer role.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              workerReplicas:
+                default: 1
+                description: WorkerReplicas of the worker Deployment.
+                format: int32
+                minimum: 0
+                type: integer
+            type: object
+          status:
+            description: ReviewPlatformStatus defines the observed state of ReviewPlatform.
+            properties:
+              conditions:
+                description: 'Conditions: Ready, DatabaseReady, Available.'
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: ObservedGeneration is the last generation reconciled.
+                format: int64
+                type: integer
+              phase:
+                description: 'Phase is a short summary: Pending, Progressing, Ready
+                  or Failed.'
+                type: string
+              url:
+                description: URL is the external URL of the platform.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

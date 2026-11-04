@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eagle-worker
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-worker
+    app.kubernetes.io/part-of: eagle
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eagle
+      app.kubernetes.io/instance: eagle
+      app.kubernetes.io/component: eagle-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eagle
+        app.kubernetes.io/instance: eagle
+        app.kubernetes.io/component: eagle-worker
+        app.kubernetes.io/part-of: eagle
+    spec:
+      serviceAccountName: eagle-worker
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: quay.io/hmoghani/eagle:v0.1.0
+          command: ["eagle", "worker"]
+          env:
+            - name: EAGLE_DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: eagle-database-url, key: url}
+            - name: EAGLE_SECRET_KEY
+              valueFrom:
+                secretKeyRef: {name: eagle-keys, key: EAGLE_SECRET_KEY}
+            - name: EAGLE_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef: {name: eagle-keys, key: EAGLE_ENCRYPTION_KEY}
+            - name: EAGLE_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_BOOTSTRAP_ADMIN_USERNAME}
+            - name: EAGLE_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: eagle-bootstrap-admin, key: password, optional: true}
+            - name: EAGLE_AUTO_CREATE_SCHEMA
+              value: "false"
+            - name: EAGLE_COOKIE_SECURE
+              value: "true"
+            - name: EAGLE_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_PUBLIC_URL}
+            - name: EAGLE_EXECUTOR
+              value: kubernetes
+            # Runner pods are labelled app.kubernetes.io/instance=<this value>;
+            # it must match the runner NetworkPolicy selector.
+            - name: EAGLE_INSTANCE_NAME
+              value: eagle
+            - name: EAGLE_K8S_NAMESPACE
+              valueFrom:
+                fieldRef: {fieldPath: metadata.namespace}
+            - name: EAGLE_RUNNER_IMAGE
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_RUNNER_IMAGE}
+            - name: EAGLE_RUNNER_SERVICE_ACCOUNT
+              value: eagle-runner
+            # Short name resolves inside the namespace, so this works for any
+            # namespace this base is deployed to.
+            - name: EAGLE_CALLBACK_BASE_URL
+              value: http://eagle-web:8000
+            - name: EAGLE_RUNNER_CPU_LIMIT
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_RUNNER_CPU_LIMIT}
+            - name: EAGLE_RUNNER_MEMORY_LIMIT
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_RUNNER_MEMORY_LIMIT}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault

@@ -1,0 +1,69 @@
+# Every field, with an external database. Create the referenced Secrets first:
+#   oc create secret generic eagle-external-db \
+#     --from-literal=url='postgresql+asyncpg://eagle:CHANGE_ME@db.example.com:5432/eagle'
+#   oc create secret generic eagle-admin --from-literal=password='CHANGE_ME'
+apiVersion: eagle.redhat.com/v1alpha1
+kind: ReviewPlatform
+metadata:
+  name: eagle
+spec:
+  image: quay.io/hmoghani/eagle:v0.1.0
+  imagePullPolicy: IfNotPresent
+  replicas: 2
+  workerReplicas: 1
+  runner:
+    image: quay.io/hmoghani/eagle-agent-runner:v0.1.0
+    resources:
+      limits:
+        cpu: "2"
+        memory: 4Gi
+    blockedCIDRs:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 100.64.0.0/10
+  route:
+    enabled: true
+    host: eagle.apps.example.com
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  database:
+    managed:
+      enabled: false
+    external:
+      secretName: eagle-external-db
+      key: url
+  # Optional: bring your own EAGLE_SECRET_KEY / EAGLE_ENCRYPTION_KEY.
+  # secrets:
+  #   existingSecret: my-eagle-keys
+  bootstrapAdmin:
+    username: admin
+    passwordSecretRef:
+      name: eagle-admin
+      key: password
+  resources:
+    web:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+    worker:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+  # Optional OIDC SSO (web only). Register this redirect URI with the IdP:
+  #   https://eagle.apps.example.com/api/v1/auth/oidc/callback
+  # oc create secret generic eagle-oidc --from-literal=clientSecret='CHANGE_ME'
+  sso:
+    issuer: https://sso.example.com/realms/example
+    clientId: eagle
+    clientSecretRef:
+      name: eagle-oidc
+      key: clientSecret
+    scopes: openid email profile
+    buttonLabel: Sign in with SSO
+    usernameClaim: preferred_username
+    groupsClaim: groups
+    adminGroups: ["eagle-admins"]
+    memberGroups: ["eagle-members"]
+    viewerGroups: []
+    defaultRole: viewer
+    localLoginEnabled: true

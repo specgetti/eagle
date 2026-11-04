@@ -1,0 +1,10 @@
+# Deploys the operator into eagle-operator-system. ReviewPlatform CRs can be
+# created in any namespace; the operator watches all namespaces.
+namespace: eagle-operator-system
+namePrefix: eagle-operator-
+
+resources:
+  - ../crd
+  - ../rbac
+  - ../manager
+  - metrics_service.yaml

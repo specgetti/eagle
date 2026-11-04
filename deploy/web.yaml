@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eagle-web
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-web
+    app.kubernetes.io/part-of: eagle
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eagle
+      app.kubernetes.io/instance: eagle
+      app.kubernetes.io/component: eagle-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eagle
+        app.kubernetes.io/instance: eagle
+        app.kubernetes.io/component: eagle-web
+        app.kubernetes.io/part-of: eagle
+    spec:
+      serviceAccountName: eagle-web
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Idempotent Alembic upgrade; runs before every web pod starts.
+        - name: migrate
+          image: quay.io/hmoghani/eagle:v0.1.0
+          command: ["eagle", "migrate"]
+          env: &appEnv
+            - name: EAGLE_DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: eagle-database-url, key: url}
+            - name: EAGLE_SECRET_KEY
+              valueFrom:
+                secretKeyRef: {name: eagle-keys, key: EAGLE_SECRET_KEY}
+            - name: EAGLE_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef: {name: eagle-keys, key: EAGLE_ENCRYPTION_KEY}
+            - name: EAGLE_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_BOOTSTRAP_ADMIN_USERNAME}
+            - name: EAGLE_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: eagle-bootstrap-admin, key: password, optional: true}
+            - name: EAGLE_AUTO_CREATE_SCHEMA
+              value: "false"
+            - name: EAGLE_COOKIE_SECURE
+              value: "true"
+            - name: EAGLE_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef: {name: eagle-config, key: EAGLE_PUBLIC_URL}
+          securityContext: &restricted
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      containers:
+        - name: web
+          image: quay.io/hmoghani/eagle:v0.1.0
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env: *appEnv
+          # Optional OIDC SSO (web container only). Uncomment together with
+          # the eagle-sso configMapGenerator in kustomization.yaml.
+          # envFrom:
+          #   - configMapRef:
+          #       name: eagle-sso
+          #   - secretRef:
+          #       name: eagle-oidc
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext: *restricted
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eagle-web
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-web
+    app.kubernetes.io/part-of: eagle
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-web
+  ports:
+    # Also serves Prometheus metrics at /metrics.
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

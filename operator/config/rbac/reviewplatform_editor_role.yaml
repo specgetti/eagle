@@ -1,0 +1,15 @@
+# Aggregated into the namespace admin/edit roles so project admins can manage ReviewPlatforms.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: reviewplatform-editor-role
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+  - apiGroups: ["eagle.redhat.com"]
+    resources: ["reviewplatforms"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["eagle.redhat.com"]
+    resources: ["reviewplatforms/status"]
+    verbs: ["get"]

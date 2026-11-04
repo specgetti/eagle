@@ -1,0 +1,389 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    categories: Developer Tools, AI/Machine Learning
+    containerImage: quay.io/hmoghani/eagle-operator:v0.1.0
+    description: Run a shared AI pull request review platform (Claude Code, Codex,
+      OpenCode) for your team.
+    features.operators.openshift.io/disconnected: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    repository: https://github.com/hmoghani/eagle
+    support: hmoghani
+  name: eagle-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ReviewPlatform is the Schema for the reviewplatforms API.
+      displayName: Review Platform
+      kind: ReviewPlatform
+      name: reviewplatforms.eagle.redhat.com
+      resources:
+      - kind: Deployment
+        name: ""
+        version: v1
+      - kind: NetworkPolicy
+        name: ""
+        version: v1
+      - kind: Role
+        name: ""
+        version: v1
+      - kind: RoleBinding
+        name: ""
+        version: v1
+      - kind: Route
+        name: ""
+        version: v1
+      - kind: Secret
+        name: ""
+        version: v1
+      - kind: Service
+        name: ""
+        version: v1
+      - kind: ServiceAccount
+        name: ""
+        version: v1
+      - kind: StatefulSet
+        name: ""
+        version: v1
+      specDescriptors:
+      - description: BootstrapAdmin configures the first admin account.
+        displayName: First admin account
+        path: bootstrapAdmin
+      - description: |-
+          PasswordSecretRef holds the bootstrap admin password. When absent the
+          app generates one and prints it to its log once.
+        displayName: Admin password Secret
+        path: bootstrapAdmin.passwordSecretRef
+      - description: Key in the Secret. Defaults to "password".
+        displayName: Key
+        path: bootstrapAdmin.passwordSecretRef.key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Name of the Secret.
+        displayName: Secret
+        path: bootstrapAdmin.passwordSecretRef.name
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: Username of the bootstrap admin.
+        displayName: Admin username
+        path: bootstrapAdmin.username
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Database selects a managed or external Postgres.
+        displayName: Database
+        path: database
+      - description: |-
+          External database. Mutually exclusive with an enabled managed database.
+          Turn off the built-in database when using this.
+        displayName: External database
+        path: database.external
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Key in the Secret that holds the URL.
+        displayName: Key in the Secret
+        path: database.external.key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          SecretName is the Secret holding the database URL
+          (postgresql+asyncpg://user:pass@host:5432/db).
+        displayName: Database URL Secret
+        path: database.external.secretName
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: Managed Postgres deployed by the operator. This is the default.
+        displayName: Built-in database
+        path: database.managed
+      - description: Enabled deploys a single replica Postgres StatefulSet.
+        displayName: Run PostgreSQL in the cluster
+        path: database.managed.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: |-
+          Image is the Postgres image. It must accept the RHEL postgresql image
+          environment (POSTGRESQL_USER, POSTGRESQL_PASSWORD, POSTGRESQL_DATABASE).
+          Empty uses the operator's default PostgreSQL image.
+        displayName: PostgreSQL image
+        path: database.managed.image
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Resources for the Postgres container.
+        displayName: PostgreSQL resources
+        path: database.managed.resources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: StorageClassName for the data volume. Empty uses the cluster
+          default.
+        displayName: Storage class
+        path: database.managed.storageClassName
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:StorageClass
+      - description: |-
+          StorageSize of the data volume. Only applied when the StatefulSet is
+          first created (volumeClaimTemplates are immutable).
+        displayName: Storage size
+        path: database.managed.storageSize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          Image is the Eagle application image shared by web and worker. Empty
+          uses the operator's default image for this release.
+        displayName: Application image
+        path: image
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: ImagePullPolicy for the application and Postgres containers.
+        displayName: Image pull policy
+        path: imagePullPolicy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:imagePullPolicy
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Replicas of the web Deployment.
+        displayName: Web replicas
+        path: replicas
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podCount
+      - description: Resources for the web and worker containers.
+        displayName: Resources
+        path: resources
+      - description: Web container resources.
+        displayName: Web resources
+        path: resources.web
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+      - description: Worker container resources.
+        displayName: Worker resources
+        path: resources.worker
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+      - description: Route configures external access.
+        displayName: External access
+        path: route
+      - description: Enabled creates a Route for the web Service.
+        displayName: Create a Route
+        path: route.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: |-
+          Host is the external host name. When empty OpenShift assigns one.
+          When the Route is disabled, Host is still used to build EAGLE_PUBLIC_URL
+          (for clusters that expose the web Service some other way).
+          Set a fixed host if you plan to enable single sign-on, so the redirect
+          URL registered with the identity provider does not change.
+        displayName: Host name
+        path: route.host
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: TLS settings.
+        displayName: TLS
+        path: route.tls
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Runner configures review Job pods.
+        displayName: Review runners
+        path: runner
+      - description: |-
+          BlockedCIDRs are IPv4 ranges runner pods may not reach. All other IPv4
+          egress is allowed so agents can reach GitHub and inference APIs.
+          An empty or missing list means the defaults (RFC 1918 ranges).
+          If a model endpoint (for example an internal MaaS) has a private address,
+          remove its range here or reviews cannot reach it.
+        displayName: Blocked network ranges
+        path: runner.blockedCIDRs
+      - description: |-
+          Image is the agent runner image used for review Jobs. Empty uses the
+          operator's default runner image. The operator only passes it to the
+          worker via EAGLE_RUNNER_IMAGE.
+        displayName: Runner image
+        path: runner.image
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: |-
+          Resources for runner pods. Only limits.cpu and limits.memory are passed
+          to the worker (EAGLE_RUNNER_CPU_LIMIT, EAGLE_RUNNER_MEMORY_LIMIT).
+          Defaults: cpu "2", memory "4Gi".
+        displayName: Resources per review
+        path: runner.resources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:resourceRequirements
+      - description: Secrets configures application key material.
+        displayName: Encryption keys
+        path: secrets
+      - description: |-
+          ExistingSecret holds EAGLE_SECRET_KEY and EAGLE_ENCRYPTION_KEY. When empty,
+          the operator generates <name>-keys once and never modifies it afterwards.
+          Only for restoring or moving an install: EAGLE_ENCRYPTION_KEY decrypts
+          every credential stored in the database.
+        displayName: Existing key Secret
+        path: secrets.existingSecret
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: SSO configures OpenID Connect login (web only).
+        displayName: Single sign-on (OIDC)
+        path: sso
+      - description: AdminGroups map to the admin role.
+        displayName: Admin groups
+        path: sso.adminGroups
+      - description: ButtonLabel shown on the login page.
+        displayName: Login button label
+        path: sso.buttonLabel
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: ClientID registered with the provider.
+        displayName: Client ID
+        path: sso.clientId
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: ClientSecretRef holds the client secret. Key defaults to "clientSecret".
+        displayName: Client secret
+        path: sso.clientSecretRef
+      - description: Key in the Secret. Defaults to "password".
+        displayName: Key
+        path: sso.clientSecretRef.key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Name of the Secret.
+        displayName: Secret
+        path: sso.clientSecretRef.name
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: DefaultRole for users in none of the mapped groups. "none" denies
+          access.
+        displayName: Role for other users
+        path: sso.defaultRole
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:admin
+        - urn:alm:descriptor:com.tectonic.ui:select:member
+        - urn:alm:descriptor:com.tectonic.ui:select:viewer
+        - urn:alm:descriptor:com.tectonic.ui:select:none
+      - description: GroupsClaim is the ID token claim holding the user's groups.
+        displayName: Groups claim
+        path: sso.groupsClaim
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: |-
+          Issuer URL of the OIDC provider. SSO is enabled only when both issuer
+          and clientId are set.
+        displayName: Issuer URL
+        path: sso.issuer
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: LocalLoginEnabled keeps username/password login available (break
+          glass).
+        displayName: Keep local login
+        path: sso.localLoginEnabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: MemberGroups map to the member role.
+        displayName: Member groups
+        path: sso.memberGroups
+      - description: Scopes requested, space separated.
+        displayName: Scopes
+        path: sso.scopes
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: UsernameClaim is the ID token claim used as the username.
+        displayName: Username claim
+        path: sso.usernameClaim
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: ViewerGroups map to the viewer role.
+        displayName: Viewer groups
+        path: sso.viewerGroups
+      - description: WorkerReplicas of the worker Deployment.
+        displayName: Worker replicas
+        path: workerReplicas
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:podCount
+      statusDescriptors:
+      - description: 'Conditions: Ready, DatabaseReady, Available.'
+        displayName: Conditions
+        path: conditions
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes.conditions
+      - description: 'Phase is a short summary: Pending, Progressing, Ready or Failed.'
+        displayName: Phase
+        path: phase
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes.phase
+      - description: URL is the external URL of the platform.
+        displayName: URL
+        path: url
+        x-descriptors:
+        - urn:alm:descriptor:org.w3:link
+      version: v1alpha1
+  description: |
+    Eagle is a central pull request review platform. Teammates paste a GitHub
+    pull request link and an AI agent (Claude Code, Codex or OpenCode) reviews it
+    in an isolated pod, then posts the review to the PR, Slack or email.
+
+    ## What this operator does
+    Create a **ReviewPlatform** in a project and the operator deploys:
+    - the Eagle web app and API, with an external Route
+    - a worker that runs each review as a locked down Kubernetes Job
+    - a PostgreSQL database (or connects to yours)
+    - generated encryption and session keys, network policies and RBAC
+
+    ## After installing
+    1. Create a project, then a ReviewPlatform in it. Every field is optional.
+    2. Open the URL shown on the ReviewPlatform and log in as the admin. Without
+       an admin password Secret, read the generated password from the web pod log.
+    3. In Eagle's admin pages add inference credentials (API keys, Vertex AI,
+       an OpenAI or Anthropic compatible MaaS), pick models and invite users.
+
+    Model credentials and settings are managed in Eagle, not in this resource.
+    They are stored encrypted in the database. The key that decrypts them is
+    the Secret <name>-keys: back it up, and it is kept when the ReviewPlatform
+    is deleted.
+  displayName: Eagle PR Review Platform
+  icon:
+  - base64data: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxZjJhNDQiLz48cGF0aCBkPSJNMTAgMzhjOC0yIDE0LTggMjItMTYgNCA2IDEwIDEwIDIyIDEwLTYgNC0xMiA2LTE4IDZsLTQgMTAtNC05Yy02IDEtMTIgMS0xOC0xeiIgZmlsbD0iI2YyYjYzMiIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iMzAiIHI9IjIuNiIgZmlsbD0iIzFmMmE0NCIvPjwvc3ZnPgo=
+    mediatype: image/svg+xml
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - code review
+  - pull request
+  - ai
+  - claude
+  - codex
+  links:
+  - name: Source
+    url: https://github.com/hmoghani/eagle
+  maintainers:
+  - email: hmoghani@gmail.com
+    name: hmoghani
+  maturity: alpha
+  minKubeVersion: 1.28.0
+  provider:
+    name: hmoghani
+  version: 0.0.0

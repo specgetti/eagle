@@ -1,0 +1,43 @@
+# The worker launches one Job per review, manages the per-run Secret holding
+# the single credential that Job needs, and reads the runner pod logs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eagle-worker
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-worker
+    app.kubernetes.io/part-of: eagle
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eagle-worker
+  labels:
+    app.kubernetes.io/name: eagle
+    app.kubernetes.io/instance: eagle
+    app.kubernetes.io/component: eagle-worker
+    app.kubernetes.io/part-of: eagle
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eagle-worker
+subjects:
+  - kind: ServiceAccount
+    name: eagle-worker
+    # Rewritten by the kustomize namespace transformer.
+    namespace: eagle

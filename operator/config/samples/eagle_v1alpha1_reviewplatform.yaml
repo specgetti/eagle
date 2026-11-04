@@ -1,0 +1,12 @@
+# Minimal ReviewPlatform: the operator's default images, a bundled PostgreSQL,
+# generated keys and an OpenShift assigned Route host. This is also the starting
+# point of the "Create ReviewPlatform" form in the OpenShift console.
+apiVersion: eagle.redhat.com/v1alpha1
+kind: ReviewPlatform
+metadata:
+  name: eagle
+spec:
+  route:
+    enabled: true
+  bootstrapAdmin:
+    username: admin

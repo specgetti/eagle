@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Local data and secrets
+*.db
+.env
+*.pem
+*.key
+
+# Node
+node_modules/
+frontend/dist/
+
+# Go operator
+operator/bin/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.db.*
+
+# Build output and local tool settings
+frontend/*.tsbuildinfo
+.claude/

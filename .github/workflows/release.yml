@@ -1,0 +1,89 @@
+name: release
+
+# Builds and pushes every image a cluster install needs (linux/amd64):
+#   <IMAGE_TAG_BASE>/eagle, eagle-agent-runner, eagle-operator,
+#   eagle-operator-bundle and eagle-operator-catalog, all tagged v<version>.
+# Then point the cluster's CatalogSource at the catalog image (deploy/README.md).
+#
+# Repository settings needed:
+#   variable IMAGE_TAG_BASE     e.g. quay.io/hmoghani
+#   secret   REGISTRY_USERNAME  e.g. a quay.io robot account
+#   secret   REGISTRY_PASSWORD
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v, e.g. 0.1.0"
+        required: true
+      previous_version:
+        description: "Version this release upgrades from (keeps it in the catalog). Empty for the first release."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG_BASE: ${{ vars.IMAGE_TAG_BASE }}
+  VERSION: ${{ inputs.version }}
+  PREVIOUS_VERSION: ${{ inputs.previous_version }}
+  PLATFORM: linux/amd64
+  # podman, opm and operator-sdk all read registry credentials from here.
+  REGISTRY_AUTH_FILE: ${{ github.workspace }}/.auth.json
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check inputs
+        run: |
+          [[ -n "$IMAGE_TAG_BASE" ]] || { echo "Set the IMAGE_TAG_BASE repository variable"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "version must look like 0.1.0"; exit 1; }
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: operator/go.mod
+          cache-dependency-path: operator/go.sum
+
+      - name: Log in to the registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          echo "$REGISTRY_PASSWORD" | podman login --authfile "$REGISTRY_AUTH_FILE" \
+            -u "$REGISTRY_USERNAME" --password-stdin "${IMAGE_TAG_BASE%%/*}"
+          mkdir -p ~/.docker && cp "$REGISTRY_AUTH_FILE" ~/.docker/config.json
+
+      - name: App and runner images
+        run: |
+          make images images-push PLATFORM=$PLATFORM TAG=v$VERSION \
+            IMAGE=$IMAGE_TAG_BASE/eagle RUNNER_IMAGE=$IMAGE_TAG_BASE/eagle-agent-runner
+
+      - name: Operator image
+        working-directory: operator
+        run: make docker-build docker-push PLATFORM=$PLATFORM IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION
+
+      - name: Bundle
+        working-directory: operator
+        run: make bundle bundle-build bundle-push IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION
+
+      - name: Catalog
+        working-directory: operator
+        run: |
+          make catalog catalog-build catalog-push IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION \
+            PREVIOUS_VERSION=$PREVIOUS_VERSION
+
+      - name: Summary
+        run: |
+          {
+            echo "### Eagle v$VERSION"
+            echo
+            for i in eagle eagle-agent-runner eagle-operator eagle-operator-bundle eagle-operator-catalog; do
+              echo "- \`$IMAGE_TAG_BASE/$i:v$VERSION\`"
+            done
+            echo
+            echo "Point the cluster's CatalogSource at \`$IMAGE_TAG_BASE/eagle-operator-catalog:v$VERSION\`."
+          } >> "$GITHUB_STEP_SUMMARY"

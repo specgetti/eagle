@@ -1,0 +1,23 @@
+# Default images for ReviewPlatforms that leave spec.image, spec.runner.image or
+# spec.database.managed.image empty. default_images.yaml is generated from
+# default_images.yaml.in by `make set-images` (run by `make bundle`): change the
+# APP_IMG, RUNNER_IMG and POSTGRES_IMG Makefile variables, not the yaml. OLM
+# lists RELATED_IMAGE_* values as the bundle's relatedImages, so mirroring tools
+# pick them up for disconnected clusters.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: RELATED_IMAGE_EAGLE
+              value: ${APP_IMG}
+            - name: RELATED_IMAGE_EAGLE_RUNNER
+              value: ${RUNNER_IMG}
+            - name: RELATED_IMAGE_POSTGRESQL
+              value: ${POSTGRES_IMG}

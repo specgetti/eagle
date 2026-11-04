@@ -1,0 +1,28 @@
+/* Review markdown: keep wide tables and code blocks inside the card. */
+.eagle-markdown {
+  overflow-wrap: anywhere;
+}
+.eagle-markdown pre {
+  overflow-x: auto;
+  padding: var(--pf-v5-global--spacer--sm);
+  background: var(--pf-v5-global--BackgroundColor--200);
+  border-radius: var(--pf-v5-global--BorderRadius--sm);
+}
+.eagle-markdown :not(pre) > code {
+  padding: 0 0.25em;
+  background: var(--pf-v5-global--BackgroundColor--200);
+  border-radius: var(--pf-v5-global--BorderRadius--sm);
+}
+.eagle-markdown table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.eagle-markdown th,
+.eagle-markdown td {
+  padding: 0.25em 0.75em;
+  border: 1px solid var(--pf-v5-global--BorderColor--100);
+}
+.eagle-markdown input[type="checkbox"] {
+  margin-right: 0.5em;
+}

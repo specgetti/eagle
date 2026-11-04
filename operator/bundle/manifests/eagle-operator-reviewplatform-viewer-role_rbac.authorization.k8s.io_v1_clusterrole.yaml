@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: eagle-operator-reviewplatform-viewer-role
+rules:
+- apiGroups:
+  - eagle.redhat.com
+  resources:
+  - reviewplatforms
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - eagle.redhat.com
+  resources:
+  - reviewplatforms/status
+  verbs:
+  - get

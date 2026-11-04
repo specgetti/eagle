@@ -1,0 +1,35 @@
+# Review runner image: git, the agent CLIs, and the stdlib-only eagle.runner package.
+# Build from the repo root:
+#   podman build --platform linux/amd64 -f agent-runner/Containerfile \
+#     -t quay.io/hmoghani/eagle-agent-runner:dev .
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+# Pinned agent CLI versions. Eagle passes CLI flags and parses their output
+# (eagle/agents.py, eagle/runner/parse.py), so bump these deliberately and run
+# one real review per agent after a bump. Override with --build-arg.
+ARG CLAUDE_CODE_VERSION=2.1.305
+ARG CODEX_VERSION=0.163.0
+ARG OPENCODE_VERSION=1.19.3
+
+USER 0
+RUN dnf -y module enable nodejs:22 \
+ && dnf -y install nodejs git-core \
+ && dnf clean all \
+ && npm install -g --no-fund --no-audit \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "@openai/codex@${CODEX_VERSION}" \
+      "opencode-ai@${OPENCODE_VERSION}" \
+ && npm cache clean --force
+
+COPY backend/eagle/__init__.py /opt/eagle/eagle/__init__.py
+COPY backend/eagle/runner /opt/eagle/eagle/runner
+
+# The runner sets a per-run HOME under /tmp (an emptyDir in the Job), so the root
+# filesystem can stay read-only.
+ENV PYTHONPATH=/opt/eagle \
+    HOME=/tmp \
+    DISABLE_AUTOUPDATER=1 \
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+USER 1001
+CMD ["python3", "-m", "eagle.runner"]
