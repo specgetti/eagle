@@ -53,10 +53,14 @@ jobs:
           cache-dependency-path: operator/go.sum
 
       - name: Install kind
+        # The runner image ships a root owned kind in /usr/local/bin; install the
+        # pinned version into a user directory that comes first on PATH.
         run: |
-          curl -sSfLo /usr/local/bin/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
-          chmod +x /usr/local/bin/kind
-          kind version
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfLo "$HOME/.local/bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x "$HOME/.local/bin/kind"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/kind" version
           kubectl version --client
 
       - name: OperatorHub install and a real review on kind
