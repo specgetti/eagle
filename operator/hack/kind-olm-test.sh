@@ -17,6 +17,8 @@
 #   CONTAINER_TOOL        podman (default, needs a rootful machine on macOS) or docker
 #   EAGLE_E2E_GITHUB_TOKEN  optional GitHub token, avoids anonymous API rate limits (CI)
 #   SKIP_REVIEW=1         stop after the install checks
+#   PRUNE_AFTER_PUSH=1    delete local build output once images are in the registry
+#                         (CI disk space; never set this on a machine you care about)
 # Needs kind, kubectl, Go and curl. Uses context kind-eagle and registry localhost:5001.
 set -euo pipefail
 
@@ -52,6 +54,7 @@ api() { curl -sf -b "$COOKIES" -c "$COOKIES" -H 'Content-Type: application/json'
 json() { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)"; }
 diagnose() {
   echo "---- diagnostics"
+  df -h / /var/lib/docker 2>/dev/null | uniq || true
   echo "registry: $(curl -s "http://$REG/v2/_catalog")"
   for image in eagle eagle-agent-runner eagle-operator eagle-operator-bundle; do
     echo "  $image tags: $(curl -s "http://$REG/v2/$image/tags/list")"
@@ -106,6 +109,15 @@ push "$REG/eagle-operator-bundle:v$VERSION"
 make -C "$OPERATOR" catalog "${MAKE_VARS[@]}" OPM_IN_CONTAINER=1 OPM_RENDER_FLAGS=--use-http >/dev/null
 make -C "$OPERATOR" catalog-build "${MAKE_VARS[@]}" >/dev/null
 push "$REG/eagle-operator-catalog:v$VERSION"
+
+if [[ ${PRUNE_AFTER_PUSH:-} == 1 ]]; then
+  step "Free disk space (images are in the registry now)"
+  for image in eagle eagle-agent-runner eagle-operator eagle-operator-bundle eagle-operator-catalog; do
+    $CT rmi -f "$REG/$image:v$VERSION" >/dev/null 2>&1 || true
+  done
+  if [[ $CT == docker ]]; then docker builder prune -af >/dev/null; else podman image prune -f >/dev/null; fi
+  df -h / | tail -1
+fi
 
 step "OLM $OLM_VERSION"
 if ! $KCTL get crd clusterserviceversions.operators.coreos.com >/dev/null 2>&1; then
