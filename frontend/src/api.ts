@@ -294,6 +294,27 @@ export interface AuditEntry {
   created_at: string;
 }
 
+export interface ApiToken {
+  id: number;
+  name: string;
+  /** The first characters of the token, to recognise it. */
+  prefix: string;
+  username: string | null;
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface ApiTokenCreated extends ApiToken {
+  /** The token itself. Only returned once, when it is created. */
+  token: string;
+}
+
+export interface ApiTokenCreate {
+  name: string;
+  expires_in_days: number | null;
+}
+
 export interface AuditPage {
   items: AuditEntry[];
   total: number;
@@ -412,6 +433,11 @@ export const api = {
   createUser: (body: UserCreate) => request<User>("POST", "/users", body),
   updateUser: (id: number, body: UserUpdate) => request<User>("PATCH", `/users/${id}`, body),
   deleteUser: (id: number) => request<void>("DELETE", `/users/${id}`),
+
+  // API tokens (need a browser session)
+  listTokens: (all = false) => request<ApiToken[]>("GET", "/tokens", undefined, { all: all || null }),
+  createToken: (body: ApiTokenCreate) => request<ApiTokenCreated>("POST", "/tokens", body),
+  revokeToken: (id: number) => request<void>("DELETE", `/tokens/${id}`),
 
   // Reviews
   reviewOptions: () => request<AgentOption[]>("GET", "/reviews/options"),

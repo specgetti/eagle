@@ -21,6 +21,7 @@ import {
 } from "@patternfly/react-core";
 import { api, errorMessage, isSsoUser } from "../api";
 import { useUser } from "../auth";
+import { ApiTokenTable, CreateApiTokenModal } from "../components/ApiTokens";
 import { useToast } from "../toast";
 
 export const MIN_PASSWORD = 12;
@@ -33,6 +34,8 @@ export function AccountPage() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [tokensVersion, setTokensVersion] = useState(0);
 
   const tooShort = next.length > 0 && next.length < MIN_PASSWORD;
   const mismatch = confirm.length > 0 && confirm !== next;
@@ -159,6 +162,25 @@ export function AccountPage() {
         </CardBody>
       </Card>
       )}
+      <Card style={{ marginTop: 16 }}>
+        <CardTitle>API tokens</CardTitle>
+        <CardBody>
+          <p style={{ marginBottom: 16 }}>
+            Use the Eagle API from scripts, CI jobs or bots: send a token as{" "}
+            <code>Authorization: Bearer &lt;token&gt;</code>. A token acts as you, with your
+            current role. See <a href="/docs">the API reference</a>.
+          </p>
+          <Button onClick={() => setCreatingToken(true)} style={{ marginBottom: 8 }}>
+            Create token
+          </Button>
+          <ApiTokenTable reloadKey={tokensVersion} />
+        </CardBody>
+      </Card>
+      <CreateApiTokenModal
+        isOpen={creatingToken}
+        onClose={() => setCreatingToken(false)}
+        onCreated={() => setTokensVersion((v) => v + 1)}
+      />
     </PageSection>
   );
 }

@@ -108,6 +108,25 @@ class User(Base):
     created_at: Mapped[datetime] = _ts()
 
 
+class ApiToken(Base):
+    """A personal access token: acts as its user, with the user's current role.
+
+    Only a SHA-256 hash of the token is stored; the token itself is shown once.
+    """
+
+    __tablename__ = "api_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    # The first characters of the token ("eagle_AbCd12"), to recognise it in lists.
+    prefix: Mapped[str] = mapped_column(String(16))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = _ts()
+
+
 class InferenceCredential(Base):
     __tablename__ = "inference_credentials"
 

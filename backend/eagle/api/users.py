@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eagle.deps import AdminUser, DbSession, audit
-from eagle.models import Role, User
+from eagle.models import ApiToken, Role, User
 from eagle.schemas import UserCreate, UserOut, UserUpdate
 from eagle.security import hash_password
 
@@ -80,6 +80,8 @@ async def delete_user(user_id: int, admin: AdminUser, db: DbSession) -> None:
         raise HTTPException(status.HTTP_409_CONFLICT, "You cannot delete your own account")
     if user.role == Role.ADMIN and not await _other_active_admins(db, user.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "Cannot remove the last active admin")
+    # Explicit, not only ON DELETE CASCADE: SQLite does not enforce foreign keys.
+    await db.execute(delete(ApiToken).where(ApiToken.user_id == user.id))
     await db.delete(user)
     audit(db, admin, "user.deleted", target=user.username)
     await db.commit()

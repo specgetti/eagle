@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from functools import lru_cache
 
 from argon2 import PasswordHasher
@@ -26,6 +28,21 @@ def _dummy_hash() -> str:
 def burn_password_check(password: str) -> None:
     """Spend the same time as a real check so unknown usernames are not detectable."""
     verify_password(_dummy_hash(), password)
+
+
+API_TOKEN_PREFIX = "eagle_"
+API_TOKEN_DISPLAY_LENGTH = 12
+
+
+def generate_api_token() -> str:
+    """A new API token: "eagle_" and 256 random bits, URL safe."""
+    return API_TOKEN_PREFIX + secrets.token_urlsafe(32)
+
+
+def hash_api_token(token: str) -> str:
+    # Tokens are random and long, so a fast unsalted hash is enough (unlike
+    # passwords); it lets a request find its token with one indexed lookup.
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 class SecretBox:

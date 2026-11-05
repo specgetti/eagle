@@ -17,6 +17,7 @@ import { GitHostsPage } from "./pages/admin/GitHostsPage";
 import { NotificationsPage } from "./pages/admin/NotificationsPage";
 import { SettingsPage } from "./pages/admin/SettingsPage";
 import { AuditPage } from "./pages/admin/AuditPage";
+import { ApiTokensPage } from "./pages/admin/ApiTokensPage";
 
 function NotFound() {
   return (
@@ -60,6 +61,7 @@ export function AppRoutes() {
             ["git-hosts", <GitHostsPage />],
             ["notifications", <NotificationsPage />],
             ["settings", <SettingsPage />],
+            ["api-tokens", <ApiTokensPage />],
             ["audit", <AuditPage />],
           ] as const
         ).map(([path, element]) => (

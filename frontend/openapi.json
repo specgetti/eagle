@@ -128,7 +128,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/auth/password": {
@@ -162,7 +167,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/auth/config": {
@@ -307,7 +317,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -346,7 +361,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/users/{user_id}": {
@@ -356,6 +376,11 @@
         ],
         "summary": "Update User",
         "operationId": "update_user_api_v1_users__user_id__patch",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -406,6 +431,11 @@
         ],
         "summary": "Delete User",
         "operationId": "delete_user_api_v1_users__user_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -414,6 +444,143 @@
             "schema": {
               "type": "integer",
               "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokens": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "List Tokens",
+        "description": "Your tokens; with all=true (admins only) every user's tokens.",
+        "operationId": "list_tokens_api_v1_tokens_get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "All"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiTokenOut"
+                  },
+                  "title": "Response List Tokens Api V1 Tokens Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Create Token",
+        "operationId": "create_token_api_v1_tokens_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiTokenCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokens/{token_id}": {
+      "delete": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Revoke Token",
+        "operationId": "revoke_token_api_v1_tokens__token_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Token Id"
             }
           }
         ],
@@ -457,7 +624,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/reviews": {
@@ -467,6 +639,11 @@
         ],
         "summary": "List Reviews",
         "operationId": "list_reviews_api_v1_reviews_get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "status",
@@ -579,6 +756,11 @@
         ],
         "summary": "Create Review",
         "operationId": "create_review_api_v1_reviews_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -620,6 +802,11 @@
         ],
         "summary": "Get Review",
         "operationId": "get_review_api_v1_reviews__review_id__get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "review_id",
@@ -662,6 +849,11 @@
         ],
         "summary": "Cancel Review",
         "operationId": "cancel_review_api_v1_reviews__review_id__cancel_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "review_id",
@@ -705,6 +897,11 @@
         "summary": "Rerun Review",
         "description": "Queue a fresh review of the same PR with the same agent, model and context.",
         "operationId": "rerun_review_api_v1_reviews__review_id__rerun_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "review_id",
@@ -758,7 +955,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -797,7 +999,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/agents": {
@@ -822,7 +1029,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/agents/{agent}": {
@@ -832,6 +1044,11 @@
         ],
         "summary": "Update Agent",
         "operationId": "update_agent_api_v1_agents__agent__put",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "agent",
@@ -898,7 +1115,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/credentials": {
@@ -923,7 +1145,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -962,7 +1189,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/credentials/{credential_id}": {
@@ -972,6 +1204,11 @@
         ],
         "summary": "Update Credential",
         "operationId": "update_credential_api_v1_credentials__credential_id__patch",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "credential_id",
@@ -1022,6 +1259,11 @@
         ],
         "summary": "Delete Credential",
         "operationId": "delete_credential_api_v1_credentials__credential_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "credential_id",
@@ -1058,6 +1300,11 @@
         "summary": "Test Credential",
         "description": "Check a credential with a cheap request (and a one-token call if a model is given).",
         "operationId": "test_credential_api_v1_credentials__credential_id__test_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "credential_id",
@@ -1111,6 +1358,11 @@
         "summary": "Credential Models",
         "description": "Models the credential's endpoint serves, for the admin model pickers.",
         "operationId": "credential_models_api_v1_credentials__credential_id__models_get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "credential_id",
@@ -1168,7 +1420,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -1207,7 +1464,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/repo-settings/{setting_id}": {
@@ -1217,6 +1479,11 @@
         ],
         "summary": "Update Repo Setting",
         "operationId": "update_repo_setting_api_v1_repo_settings__setting_id__put",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "setting_id",
@@ -1267,6 +1534,11 @@
         ],
         "summary": "Delete Repo Setting",
         "operationId": "delete_repo_setting_api_v1_repo_settings__setting_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "setting_id",
@@ -1317,7 +1589,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -1356,7 +1633,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/git-hosts/{host_id}": {
@@ -1366,6 +1648,11 @@
         ],
         "summary": "Update Git Host",
         "operationId": "update_git_host_api_v1_git_hosts__host_id__put",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "host_id",
@@ -1416,6 +1703,11 @@
         ],
         "summary": "Delete Git Host",
         "operationId": "delete_git_host_api_v1_git_hosts__host_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "host_id",
@@ -1466,7 +1758,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -1505,7 +1802,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "API token": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/{channel_id}": {
@@ -1515,6 +1817,11 @@
         ],
         "summary": "Update Channel",
         "operationId": "update_channel_api_v1_notifications__channel_id__patch",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "channel_id",
@@ -1565,6 +1872,11 @@
         ],
         "summary": "Delete Channel",
         "operationId": "delete_channel_api_v1_notifications__channel_id__delete",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "channel_id",
@@ -1600,6 +1912,11 @@
         ],
         "summary": "Test Channel",
         "operationId": "test_channel_api_v1_notifications__channel_id__test_post",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "channel_id",
@@ -1635,6 +1952,11 @@
         ],
         "summary": "List Tracked",
         "operationId": "list_tracked_api_v1_tracked_prs_get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "include_closed",
@@ -1682,6 +2004,11 @@
         ],
         "summary": "Update Tracked",
         "operationId": "update_tracked_api_v1_tracked_prs__tracked_id__patch",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "tracked_id",
@@ -1734,6 +2061,11 @@
         ],
         "summary": "List Audit",
         "operationId": "list_audit_api_v1_audit_get",
+        "security": [
+          {
+            "API token": []
+          }
+        ],
         "parameters": [
           {
             "name": "action",
@@ -2004,6 +2336,171 @@
         ],
         "title": "AgentOption",
         "description": "What the submit form needs: enabled agents and their models."
+      },
+      "ApiTokenCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ApiTokenCreate"
+      },
+      "ApiTokenCreated": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "expires_at",
+          "last_used_at",
+          "created_at",
+          "token"
+        ],
+        "title": "ApiTokenCreated"
+      },
+      "ApiTokenOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "expires_at",
+          "last_used_at",
+          "created_at"
+        ],
+        "title": "ApiTokenOut"
       },
       "AuditOut": {
         "properties": {
@@ -3790,6 +4287,13 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "API token": {
+        "type": "http",
+        "description": "A personal API token from Account > API tokens (eagle_...).",
+        "scheme": "bearer"
       }
     }
   }

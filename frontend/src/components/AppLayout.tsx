@@ -39,6 +39,7 @@ export const ADMIN_LINKS = [
   { to: "/admin/git-hosts", label: "Git hosts" },
   { to: "/admin/notifications", label: "Notifications" },
   { to: "/admin/settings", label: "Settings" },
+  { to: "/admin/api-tokens", label: "API tokens" },
   { to: "/admin/audit", label: "Audit log" },
 ];
 

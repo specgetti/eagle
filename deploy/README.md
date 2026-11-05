@@ -361,6 +361,39 @@ oc delete secret -n eagle eagle-keys eagle-db eagle-database-url eagle-bootstrap
 
 ---
 
+## Using the API and Swagger UI (all paths)
+
+Eagle serves its REST API under `/api/v1` on the same Route as the UI, with a
+live, interactive reference:
+
+| URL | What |
+|-----|------|
+| `https://<eagle host>/docs` | Swagger UI: every endpoint, its fields, and **Try it out** |
+| `https://<eagle host>/redoc` | The same reference as a single readable page |
+| `https://<eagle host>/openapi.json` | OpenAPI 3 schema, for generating a client |
+
+The host is the ReviewPlatform's URL: `oc get rp eagle -n eagle -o jsonpath='{.status.url}'`.
+
+To call the API, create a personal token in the UI under **Account > API
+tokens** (shown once; it acts as you, with your role). Then either:
+
+- **In Swagger UI**: click **Authorize**, paste the token under "API token",
+  and use **Try it out** on any endpoint, for example `POST /api/v1/reviews`
+  with `{"pr_url": "https://github.com/org/repo/pull/12"}`. When you are signed
+  in to Eagle in the same browser, Swagger also works without a token.
+- **From a script or CI job**:
+
+  ```bash
+  EAGLE_URL=$(oc get rp eagle -n eagle -o jsonpath='{.status.url}')
+  curl -s -H "Authorization: Bearer $EAGLE_TOKEN" -H "Content-Type: application/json" \
+    -d '{"pr_url": "https://github.com/org/repo/pull/12"}' "$EAGLE_URL/api/v1/reviews"
+  curl -s -H "Authorization: Bearer $EAGLE_TOKEN" "$EAGLE_URL/api/v1/reviews/<id>"
+  ```
+
+Admins list and revoke every user's tokens under **Admin > API tokens**.
+Creating or revoking tokens and changing a password need a signed in browser
+session; a token cannot do it. See [../README.md](../README.md#using-the-api).
+
 ## Backup and restore
 
 Two things make up an Eagle install's state: the PostgreSQL database and the

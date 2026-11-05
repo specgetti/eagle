@@ -33,6 +33,42 @@ Eagle runs on OpenShift and is installed and managed by its own operator.
   single sign-on with group to role mapping. Audit log.
 - **Integrations**: GitHub and GitHub Enterprise tokens, Slack (webhook or bot)
   and SMTP notifications, per-repository rules, Prometheus `/metrics`.
+- **REST API** with personal API tokens, for scripts, CI jobs and bots. See
+  [Using the API](#using-the-api).
+
+## Using the API
+
+Everything the UI does goes through the REST API under `/api/v1`. The live,
+interactive reference is **Swagger UI** at `https://<eagle host>/docs` (also
+`/redoc`, and the schema at `/openapi.json`): click **Authorize**, paste an API
+token, and try any endpoint from the browser. More in
+[deploy/README.md](deploy/README.md#using-the-api-and-swagger-ui-all-paths).
+
+Scripts authenticate with a personal API token: **Account > API tokens >
+Create token**. The token is shown once; only a hash is stored. It acts as you,
+with your current role (a viewer's token can only read), and stops working when
+it expires, is revoked, or your account is deactivated. Admins see and revoke
+every token under **Admin > API tokens**. Creating and revoking tokens and
+changing a password need a browser session, so a leaked token cannot create
+more tokens or lock its owner out.
+
+```bash
+export EAGLE_URL=https://eagle-web-eagle.apps.example.com
+export EAGLE_TOKEN=eagle_...            # from Account > API tokens
+
+# Submit a PR (agent, model, post_comment and custom_prompt are optional)
+curl -s -H "Authorization: Bearer $EAGLE_TOKEN" -H "Content-Type: application/json" \
+  -d '{"pr_url": "https://github.com/org/repo/pull/12"}' \
+  "$EAGLE_URL/api/v1/reviews"
+
+# Follow it: status is queued, running, then succeeded, failed or cancelled
+curl -s -H "Authorization: Bearer $EAGLE_TOKEN" "$EAGLE_URL/api/v1/reviews/<id>" \
+  | jq '{status, verdict, summary}'
+```
+
+Other review calls: `GET /api/v1/reviews` (list and filter),
+`POST /api/v1/reviews/<id>/cancel`, `POST /api/v1/reviews/<id>/rerun` and
+`GET /api/v1/reviews/options` (agents and models you may pick).
 
 ## Deploy on OpenShift
 
@@ -141,6 +177,9 @@ volume, so reinstalling with the same name keeps all data.
   private address ranges (configurable when a model endpoint is internal).
 - Each review gets only its own credential, in a Secret deleted when the review
   finishes, and reports back with a one-time token.
+- API tokens are stored as SHA-256 hashes, shown once, carry their owner's
+  role, and cannot create tokens or change passwords. Creation and revocation
+  are in the audit log.
 - Secrets in the UI are write-only and masked; agent output is scrubbed of known
   secret values. Subscription credentials show a warning: sharing a personal
   subscription through a team service may conflict with provider terms.

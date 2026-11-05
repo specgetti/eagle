@@ -36,6 +36,35 @@ class UserOut(ORM):
     created_at: datetime
 
 
+class ApiTokenCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    # Omitted: the token never expires.
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
+
+    @field_validator("name")
+    @classmethod
+    def _strip(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name must not be blank")
+        return value
+
+
+class ApiTokenOut(ORM):
+    id: int
+    name: str
+    prefix: str
+    username: str | None = None
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    created_at: datetime
+
+
+class ApiTokenCreated(ApiTokenOut):
+    # The token itself. Returned once, at creation; only its hash is stored.
+    token: str
+
+
 class UserCreate(BaseModel):
     username: Username
     password: Password
