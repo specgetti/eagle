@@ -9,8 +9,13 @@ from pathlib import Path
 import pytest
 
 from eagle.runner import __main__ as runner
-from eagle.runner.parse import AgentOutputError, parse_agent_output, parse_review
-from eagle.runner.progress import Progress, describe_claude_event
+from eagle.runner.parse import (
+    AgentOutputError,
+    parse_agent_output,
+    parse_review,
+    reported_model,
+)
+from eagle.runner.progress import Progress, describe_claude_event, describe_model
 from tests.fakes import FAKE_CLAUDE, make_fake_cli
 
 REVIEW_TEXT = """## Summary
@@ -416,14 +421,16 @@ sys.stderr.write("warning: using sk-test-key-123\\n")
 """,
     )
     out = io.StringIO()
-    spec = claude_spec(pr_repo, tmp_path)
+    spec = claude_spec(pr_repo, tmp_path, model_source="agent_default")
     result = runner.run(spec, progress=Progress(["sk-test-key-123"], out=out))
     assert result["status"] == "succeeded", result
+    assert result["model"] == "glm-5.3"
     log = out.getvalue()
     for expected in (
         "checking out pull request 7 of ",
         f"checked out {pr_repo['head']}",
-        "starting claude with model m",
+        "starting claude with model m (agent default)",
+        "the agent reports it used model glm-5.3",
         "Claude Code 2.1.305 started: model glm-5.3",
         "tool Bash git diff main",
         "claude: warning: using ***",
@@ -441,4 +448,79 @@ def test_runner_logs_plain_agent_output(pr_repo, tmp_path, fake_bin):
     out = io.StringIO()
     result = runner.run(spec, progress=Progress([], out=out))
     assert result["status"] == "succeeded", result
-    assert "opencode: thinking about it" in out.getvalue()
+    assert "model" not in result or result["model"] is None
+    log = out.getvalue()
+    assert "opencode: thinking about it" in log
+    assert "starting opencode with the CLI's default model" in log
+    assert "the agent did not report which model it used" in log
+
+
+@pytest.mark.parametrize(
+    ("kind", "stdout", "stderr", "expected"),
+    [
+        (
+            "claude_json",
+            '{"type":"system","subtype":"init","model":"glm-5.3"}\n{"type":"result"}',
+            "",
+            "glm-5.3",
+        ),
+        ("claude_json", '{"type":"result","result":"x"}', "", None),
+        ("claude_json", "not json\n", "", None),
+        ("file", "", "workdir: /x\nmodel: gpt-5-codex\nprovider: openai\n", "gpt-5-codex"),
+        ("file", "", "\x1b[1mmodel:\x1b[0m o4-mini\n", "o4-mini"),
+        ("stdout", "the model: is not a header line\n", "", None),
+    ],
+)
+def test_reported_model(kind, stdout, stderr, expected):
+    assert reported_model(kind, stdout, stderr) == expected
+
+
+def test_describe_model():
+    assert describe_model("glm-5", "agent_default") == "model glm-5 (agent default)"
+    assert describe_model("glm-5", "requested") == "model glm-5 (requested)"
+    assert describe_model("glm-5", None) == "model glm-5"
+    assert describe_model(None, None) == "the CLI's default model"
+
+
+def test_runner_reports_the_codex_model(pr_repo, tmp_path, fake_bin):
+    make_fake_cli(
+        fake_bin,
+        "codex",
+        """
+        import sys, pathlib
+        sys.stdin.read()
+        sys.stderr.write("--------\\nworkdir: /tmp\\nmodel: gpt-5-codex\\nprovider: openai\\n--------\\n")
+        out = sys.argv[sys.argv.index("--output-last-message") + 1]
+        pathlib.Path(out).write_text("Fine.\\n\\nVERDICT: approve")
+        """,
+    )
+    spec = claude_spec(pr_repo, tmp_path)
+    spec["invocation"] = {
+        "argv": ["codex", "exec", "--output-last-message", "{HOME}/last.md", "-"],
+        "env": {},
+        "files": {},
+        "stdin": "P",
+        "output": "file",
+        "output_file": "{HOME}/last.md",
+    }
+    result = runner.run(spec, progress=Progress([], out=io.StringIO()))
+    assert result["status"] == "succeeded", result
+    assert result["model"] == "gpt-5-codex"
+
+
+def test_runner_reports_the_model_of_a_failed_run(pr_repo, tmp_path, fake_bin):
+    make_fake_cli(
+        fake_bin,
+        "claude",
+        """
+import json, sys
+sys.stdin.read()
+print(json.dumps({"type": "system", "subtype": "init", "model": "claude-sonnet-4-5"}))
+print(json.dumps({"type": "result", "is_error": True, "result": "model not found"}))
+sys.exit(1)
+""",
+    )
+    result = runner.run(claude_spec(pr_repo, tmp_path), progress=Progress([], out=io.StringIO()))
+    assert result["status"] == "failed"
+    assert result["model"] == "claude-sonnet-4-5"
+    assert "model not found" in result["error"]

@@ -85,6 +85,10 @@ export interface Review {
   previous_review_id: number | null;
   agent: AgentKind;
   model: string | null;
+  /** "requested", "agent_default", or null when the agent CLI picks the model. */
+  model_source: string | null;
+  /** The model the agent said it used, when it says. */
+  reported_model: string | null;
   post_comment: boolean;
   status: ReviewStatus;
   summary: string | null;

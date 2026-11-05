@@ -231,6 +231,12 @@ class Review(Base):
 
     agent: Mapped[AgentKind] = mapped_column(_enum(AgentKind))
     model: Mapped[str | None] = mapped_column(String(128))
+    # Where `model` came from: "requested" (the submitter picked it), "agent_default"
+    # (the agent's default model) or None (no model: the agent CLI picks its own).
+    model_source: Mapped[str | None] = mapped_column(String(16))
+    # The model the agent said it used, from its own output (Claude Code's init event,
+    # the Codex header). None when the agent does not report it.
+    reported_model: Mapped[str | None] = mapped_column(String(128))
     # Optional extra context from the submitter, appended to the review instructions.
     custom_prompt: Mapped[str | None] = mapped_column(Text)
     post_comment: Mapped[bool] = mapped_column(default=False)

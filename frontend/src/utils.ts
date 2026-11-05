@@ -1,4 +1,4 @@
-import { AgentKind, CredentialKind, ReviewStatus } from "./api";
+import { AgentKind, CredentialKind, Review, ReviewStatus } from "./api";
 
 export const AGENT_LABELS: Record<AgentKind, string> = {
   claude: "Claude Code",
@@ -20,6 +20,40 @@ export const ACTIVE_STATUSES: ReviewStatus[] = ["queued", "running"];
 
 export function isActive(status: ReviewStatus): boolean {
   return ACTIVE_STATUSES.includes(status);
+}
+
+/**
+ * The model a review used and where it came from. Prefers the model the agent
+ * reported over the one Eagle asked for, and notes when they differ.
+ */
+export function describeReviewModel(
+  r: Pick<Review, "model" | "model_source" | "reported_model" | "status">,
+): { name: string; note: string | null } {
+  const source =
+    r.model_source === "agent_default"
+      ? "agent default"
+      : r.model
+        ? null
+        : "CLI default";
+  if (r.reported_model) {
+    if (r.model && r.model !== r.reported_model) {
+      return {
+        name: r.reported_model,
+        note: `${source ?? "requested"}: ${r.model}`,
+      };
+    }
+    return { name: r.reported_model, note: source };
+  }
+  if (r.model) return { name: r.model, note: source };
+  const finished = r.status === "succeeded" || r.status === "failed";
+  return { name: "CLI default", note: finished ? "model not reported" : null };
+}
+
+export function modelText(
+  r: Parameters<typeof describeReviewModel>[0],
+): string {
+  const { name, note } = describeReviewModel(r);
+  return note ? `${name} (${note})` : name;
 }
 
 /**

@@ -16,6 +16,7 @@ class RunSpec:
     agent: str = ""
     model: str | None = None
     prompt: str = ""
+    model_source: str | None = None
 
     def to_dict(
         self, result_path: str | None = None, callback: dict[str, str] | None = None
@@ -30,6 +31,7 @@ class RunSpec:
                 "token": self.git_token,
             },
             "invocation": self.invocation,
+            "model_source": self.model_source,
             "timeout_seconds": self.timeout_seconds,
             "result_path": result_path,
             "callback": callback,

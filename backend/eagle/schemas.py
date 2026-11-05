@@ -119,6 +119,8 @@ class ReviewOut(ORM):
     previous_review_id: int | None
     agent: AgentKind
     model: str | None
+    model_source: str | None = None
+    reported_model: str | None = None
     post_comment: bool
     status: ReviewStatus
     summary: str | None
@@ -154,6 +156,8 @@ class RunnerResult(BaseModel):
     usage: dict[str, Any] | None = None
     cost_usd: float | None = None
     head_sha: str | None = Field(default=None, max_length=64)
+    # The model the agent reported using, when its output says.
+    model: str | None = Field(default=None, max_length=128)
     error: str | None = Field(default=None, max_length=20000)
 
 

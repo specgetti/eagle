@@ -20,7 +20,13 @@ import {
   TextInput,
 } from "@patternfly/react-core";
 import ExclamationTriangleIcon from "@patternfly/react-icons/dist/esm/icons/exclamation-triangle-icon";
-import { AgentKind, api, errorMessage, ReviewCreate, ReviewDetail } from "../api";
+import {
+  AgentKind,
+  api,
+  errorMessage,
+  ReviewCreate,
+  ReviewDetail,
+} from "../api";
 import { useAsync } from "../hooks";
 import { AGENT_LABELS, fromTriState, TriState } from "../utils";
 import { TriStateSelect } from "./TriStateSelect";
@@ -72,10 +78,18 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
 
   const modelField =
     selected && selected.allowed_models.length > 0 ? (
-      <FormSelect id="review-model" value={model} onChange={(_e, v) => setModel(v)}>
+      <FormSelect
+        id="review-model"
+        value={model}
+        onChange={(_e, v) => setModel(v)}
+      >
         <FormSelectOption
           value=""
-          label={`Default${selected.default_model ? ` (${selected.default_model})` : ""}`}
+          label={
+            selected.default_model
+              ? `Agent default (${selected.default_model})`
+              : "CLI default"
+          }
         />
         {selected.allowed_models.map((m) => (
           <FormSelectOption key={m} value={m} label={m} />
@@ -86,16 +100,32 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
         id="review-model"
         value={model}
         onChange={(_e, v) => setModel(v)}
-        placeholder={selected?.default_model ?? "Agent default"}
+        placeholder={
+          !selected
+            ? "Agent default"
+            : selected.default_model
+              ? `Agent default: ${selected.default_model}`
+              : "CLI default"
+        }
       />
     );
+  const modelHelp = !selected
+    ? "Leave blank to use the agent's default model"
+    : selected.default_model
+      ? `Leave blank to use the agent default, ${selected.default_model}`
+      : "No default model is set for this agent, so the agent CLI picks one. The review shows the model it reports.";
 
   return (
     <Card>
       <CardTitle>Request a review</CardTitle>
       <CardBody>
         {error && (
-          <Alert variant="danger" isInline title={error} style={{ marginBottom: 16 }} />
+          <Alert
+            variant="danger"
+            isInline
+            title={error}
+            style={{ marginBottom: 16 }}
+          />
         )}
         {options.error && (
           <Alert
@@ -116,7 +146,11 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
         <Form onSubmit={submit}>
           <Grid hasGutter>
             <GridItem md={12} lg={6}>
-              <FormGroup label="Pull request URL" isRequired fieldId="review-pr-url">
+              <FormGroup
+                label="Pull request URL"
+                isRequired
+                fieldId="review-pr-url"
+              >
                 <TextInput
                   id="review-pr-url"
                   isRequired
@@ -137,7 +171,10 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
                     setModel("");
                   }}
                 >
-                  <FormSelectOption value="" label="Default (repo or platform)" />
+                  <FormSelectOption
+                    value=""
+                    label="Default (repo or platform)"
+                  />
                   {agents.map((o) => (
                     <FormSelectOption
                       key={o.agent}
@@ -148,7 +185,11 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
                 </FormSelect>
                 {selected && !selected.configured && (
                   <FormHelperText>
-                    <Label color="orange" icon={<ExclamationTriangleIcon />} isCompact>
+                    <Label
+                      color="orange"
+                      icon={<ExclamationTriangleIcon />}
+                      isCompact
+                    >
                       No credential configured
                     </Label>
                   </FormHelperText>
@@ -160,13 +201,16 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
                 {modelField}
                 <FormHelperText>
                   <HelperText>
-                    <HelperTextItem>Leave blank to use the default</HelperTextItem>
+                    <HelperTextItem>{modelHelp}</HelperTextItem>
                   </HelperText>
                 </FormHelperText>
               </FormGroup>
             </GridItem>
             <GridItem md={4} lg={2}>
-              <FormGroup label="Post review as PR comment" fieldId="review-post-comment">
+              <FormGroup
+                label="Post review as PR comment"
+                fieldId="review-post-comment"
+              >
                 <TriStateSelect
                   id="review-post-comment"
                   value={postComment}
@@ -183,7 +227,9 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
                 <TextArea
                   id="review-custom-prompt"
                   value={customPrompt}
-                  onChange={(_e, v) => setCustomPrompt(v.slice(0, CUSTOM_PROMPT_MAX))}
+                  onChange={(_e, v) =>
+                    setCustomPrompt(v.slice(0, CUSTOM_PROMPT_MAX))
+                  }
                   maxLength={CUSTOM_PROMPT_MAX}
                   rows={3}
                   resizeOrientation="vertical"
@@ -192,7 +238,11 @@ export function SubmitReviewForm({ onSubmitted }: Props) {
                 <FormHelperText>
                   <HelperText>
                     <HelperTextItem
-                      variant={customPrompt.length >= CUSTOM_PROMPT_MAX ? "warning" : "default"}
+                      variant={
+                        customPrompt.length >= CUSTOM_PROMPT_MAX
+                          ? "warning"
+                          : "default"
+                      }
                     >
                       {customPrompt.length} / {CUSTOM_PROMPT_MAX} characters
                     </HelperTextItem>

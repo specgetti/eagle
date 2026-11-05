@@ -1,10 +1,12 @@
 """Worker lifecycle tests with the mock executor and fake GitHub/Slack/SMTP."""
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from eagle.executors.base import RUNNING, Executor, RunState
 from eagle.executors.mock import MockExecutor
-from eagle.models import Review, TrackedPR
+from eagle.models import Review, ReviewStatus, TrackedPR
+from eagle.services import apply_result
+from eagle.worker import comment_body
 from tests.conftest import PR
 from tests.fakes import FakeSMTP
 
@@ -358,3 +360,61 @@ async def test_two_workers_do_not_double_launch(admin_client, make_worker):
 
     await asyncio.gather(worker_a.dispatch(), worker_b.dispatch())
     assert len(a.launched) + len(b.launched) == 1
+
+
+async def test_reported_model_is_stored_and_used_in_the_comment(
+    app, admin_client, client, make_worker, settings, caplog
+):
+    await admin_client.put("/api/v1/agents/claude", json={"default_model": "glm-5"})
+    executor = CallbackExecutor()
+    worker = make_worker(executor)
+    review = await submit(admin_client)
+    with caplog.at_level("INFO", logger="eagle.worker"):
+        await worker.dispatch()
+    assert f"Started review {review['id']} (claude, model glm-5 (agent default))" in caplog.text
+
+    callback = executor.callbacks[f"job-{review['id']}"]
+    result = {
+        "status": "succeeded",
+        "markdown": "## Summary\nFine",
+        "verdict": "approve",
+        "model": "glm-5.3-fp8",
+    }
+    resp = await client.post(
+        callback["url"].removeprefix(settings.callback_base_url),
+        json=result,
+        headers={"Authorization": f"Bearer {callback['token']}"},
+    )
+    assert resp.status_code == 204
+    final = await get(admin_client, review["id"])
+    assert final["model"] == "glm-5"
+    assert final["model_source"] == "agent_default"
+    assert final["reported_model"] == "glm-5.3-fp8"
+
+    async with app.state.db.sessionmaker() as db:
+        row = await db.get(Review, review["id"])
+        assert "Reviewed by claude (glm-5.3-fp8)" in comment_body(row, settings)
+
+
+async def test_failed_run_keeps_the_reported_model(app, admin_client):
+    review = await submit(admin_client)
+    async with app.state.db.sessionmaker() as db:
+        await db.execute(
+            update(Review).where(Review.id == review["id"]).values(status=ReviewStatus.RUNNING)
+        )
+        await db.commit()
+        applied = await apply_result(
+            db, review["id"], {"status": "failed", "error": "boom", "model": "claude-x"}
+        )
+    assert applied
+    final = await get(admin_client, review["id"])
+    assert (final["status"], final["reported_model"]) == ("failed", "claude-x")
+
+
+async def test_rerun_keeps_the_model_source(admin_client):
+    await admin_client.put("/api/v1/agents/claude", json={"default_model": "glm-5"})
+    review = await submit(admin_client)
+    await admin_client.post(f"/api/v1/reviews/{review['id']}/cancel")
+    rerun = await admin_client.post(f"/api/v1/reviews/{review['id']}/rerun")
+    assert rerun.status_code == 201, rerun.text
+    assert (rerun.json()["model"], rerun.json()["model_source"]) == ("glm-5", "agent_default")

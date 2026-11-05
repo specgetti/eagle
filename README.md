@@ -22,7 +22,9 @@ Eagle runs on OpenShift and is installed and managed by its own operator.
 
 - **Reviews**: PR URL, agent, model, optional extra context for the reviewer,
   optional PR comment. Re-run, cancel, filter, and incremental re-reviews of new
-  commits by the PR poller (off by default).
+  commits by the PR poller (off by default). Each review shows the model the
+  agent reported using and where it came from (picked, agent default, or the
+  CLI's own default).
 - **Agents**: Claude Code, Codex and OpenCode, each with a credential, a default
   model, the models members may pick, team instructions and a timeout.
 - **Model access**: Anthropic API key, Claude subscription token, Vertex AI,
@@ -137,7 +139,9 @@ Command line and plain Kustomize installs, upgrades and every option:
    - Anthropic-compatible endpoints (Claude Code through a MaaS) take the root
      URL without `/v1`.
 2. **Agents**: pick each agent's credential, **Fetch models**, tick the models
-   members may use and choose a default.
+   members may use and choose a default. Set a default for agents on an
+   Anthropic-compatible or OpenAI-compatible gateway: without one the CLI asks
+   the gateway for its own built-in model name.
 3. **Git hosts**: a GitHub token for private repositories or to post comments.
 4. **Notifications**, **Repositories** (per-repo instructions) and **Settings**
    (concurrency, PR poller, comment default) as needed.

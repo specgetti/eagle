@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Codex prints its settings before running, one per line ("model: gpt-5-codex").
+_CODEX_MODEL = re.compile(r"^model:\s*(\S+)\s*$", re.MULTILINE)
 _VERDICT = re.compile(
     r"^[\s>*_`]*VERDICT[\s*_`]*:[\s*_`]*(approve|comment|request[_ ]changes)\b.*$",
     re.IGNORECASE | re.MULTILINE,
@@ -64,6 +66,37 @@ def find_claude_result(stdout: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return data if isinstance(data, dict) else None
+
+
+def reported_model(output_kind: str | None, stdout: str, stderr: str) -> str | None:
+    """The model the agent says it used, from its own output, if it says.
+
+    Claude Code names it in the stream-json init event; Codex in the settings
+    header it prints before running. OpenCode does not report it.
+    """
+    if output_kind == "claude_json":
+        for line in stdout.splitlines():
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                isinstance(event, dict)
+                and event.get("type") == "system"
+                and event.get("subtype") == "init"
+                and isinstance(event.get("model"), str)
+                and event["model"]
+            ):
+                return event["model"]
+        return None
+    for text in (stderr, stdout):
+        match = _CODEX_MODEL.search(_ANSI.sub("", text))
+        if match:
+            return match.group(1)
+    return None
 
 
 def _parse_claude(stdout: str) -> AgentOutput:

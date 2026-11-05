@@ -37,6 +37,7 @@ from eagle.models import (
 )
 from eagle.notify import NotificationError, Notifier, ReviewEvent
 from eagle.prompt import PromptContext, build_prompt
+from eagle.runner.progress import describe_model
 from eagle.security import SecretBox
 from eagle.services import (
     apply_result,
@@ -65,7 +66,8 @@ def review_url(settings: Settings, review_id: int) -> str:
 
 
 def comment_body(review: Review, settings: Settings) -> str:
-    model = f" ({review.model})" if review.model else ""
+    used = review.reported_model or review.model
+    model = f" ({used})" if used else ""
     sha = f" at `{review.head_sha[:10]}`" if review.head_sha else ""
     header = (
         f"## Eagle review\n\n_Reviewed by {review.agent}{model}{sha}. "
@@ -206,8 +208,10 @@ class Worker:
                 timeout_seconds=config.timeout_seconds,
                 agent=review.agent,
                 model=review.model,
+                model_source=review.model_source,
                 prompt=prompt,
             )
+            started = f"{review.agent}, {describe_model(review.model, review.model_source)}"
 
             callback = None
             if self._executor.uses_callback:
@@ -230,7 +234,7 @@ class Worker:
             await self._executor.cancel(ref)
             await self._executor.cleanup(ref)
             return
-        logger.info("Started review %s (%s)", review_id, ref)
+        logger.info("Started review %s (%s) as %s", review_id, started, ref)
 
     # Reap
 
@@ -372,7 +376,7 @@ class Worker:
             pr_url=review.pr_url,
             title=review.title,
             agent=review.agent,
-            model=review.model,
+            model=review.reported_model or review.model,
             verdict=review.verdict,
             summary=review.summary,
             error=review.error,
@@ -454,6 +458,7 @@ class Worker:
                 since_sha=tracked.last_reviewed_sha,
                 agent=template.agent,
                 model=template.model,
+                model_source=template.model_source,
                 custom_prompt=template.custom_prompt,
                 post_comment=template.post_comment,
                 status=ReviewStatus.QUEUED,

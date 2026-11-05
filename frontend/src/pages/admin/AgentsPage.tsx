@@ -23,13 +23,25 @@ import {
   TextInput,
   Title,
 } from "@patternfly/react-core";
-import { AgentConfig, api, Credential, errorMessage } from "../../api";
+import {
+  AgentConfig,
+  api,
+  Credential,
+  CredentialKind,
+  errorMessage,
+} from "../../api";
 import { ChipListInput } from "../../components/ChipListInput";
 import { ModelPicker } from "../../components/ModelPicker";
 import { Empty, LoadError, Loading } from "../../components/States";
 import { useAsync } from "../../hooks";
 import { useToast } from "../../toast";
 import { AGENT_LABELS, CREDENTIAL_KIND_LABELS } from "../../utils";
+
+/** Gateways serve their own model names, so the CLI's built in default rarely fits. */
+const GATEWAY_CREDENTIAL_KINDS: CredentialKind[] = [
+  "anthropic_compatible",
+  "openai_compatible",
+];
 
 function AgentCard({
   config,
@@ -57,7 +69,9 @@ function AgentCard({
     setEnabled(config.enabled);
     setDefaultModel(config.default_model ?? "");
     setAllowed(config.allowed_models);
-    setCredentialId(config.credential_id === null ? "" : String(config.credential_id));
+    setCredentialId(
+      config.credential_id === null ? "" : String(config.credential_id),
+    );
     setInstructions(config.instructions ?? "");
     setTimeoutSeconds(String(config.timeout_seconds));
   }, [config]);
@@ -66,12 +80,15 @@ function AgentCard({
     config.compatible_credential_kinds.includes(c.kind),
   );
   const timeoutNum = Number(timeout);
-  const timeoutValid = Number.isInteger(timeoutNum) && timeoutNum >= 60 && timeoutNum <= 7200;
-  const defaultNotAllowed = !!defaultModel && allowed.length > 0 && !allowed.includes(defaultModel);
+  const timeoutValid =
+    Number.isInteger(timeoutNum) && timeoutNum >= 60 && timeoutNum <= 7200;
+  const defaultNotAllowed =
+    !!defaultModel && allowed.length > 0 && !allowed.includes(defaultModel);
 
   const changeAllowed = (v: string[]) => {
     setAllowed(v);
-    if (defaultModel && v.length > 0 && !v.includes(defaultModel)) setDefaultModel("");
+    if (defaultModel && v.length > 0 && !v.includes(defaultModel))
+      setDefaultModel("");
   };
 
   const save = async () => {
@@ -96,6 +113,13 @@ function AgentCard({
   };
 
   const id = (name: string) => `agent-${config.agent}-${name}`;
+  const selectedCredential = credentials.find(
+    (c) => String(c.id) === credentialId,
+  );
+  const needsDefaultModel =
+    selectedCredential !== undefined &&
+    GATEWAY_CREDENTIAL_KINDS.includes(selectedCredential.kind) &&
+    !defaultModel.trim();
 
   return (
     <Card>
@@ -151,7 +175,10 @@ function AgentCard({
                   {compatible.length === 0 ? (
                     <>
                       No compatible credentials yet.{" "}
-                      <Link to="/admin/credentials">Add one under Credentials</Link>.
+                      <Link to="/admin/credentials">
+                        Add one under Credentials
+                      </Link>
+                      .
                     </>
                   ) : (
                     `Compatible kinds: ${config.compatible_credential_kinds
@@ -180,7 +207,8 @@ function AgentCard({
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Models members may pick when submitting. Empty means any model name is accepted.
+                  Models members may pick when submitting. Empty means any model
+                  name is accepted.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -204,7 +232,9 @@ function AgentCard({
                   value={defaultModel}
                   onChange={(_e, v) => setDefaultModel(v)}
                   placeholder="Agent CLI default"
-                  list={fetchedModels.length ? id("default-options") : undefined}
+                  list={
+                    fetchedModels.length ? id("default-options") : undefined
+                  }
                   autoComplete="off"
                 />
                 {fetchedModels.length > 0 && (
@@ -219,12 +249,24 @@ function AgentCard({
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Used for every review that does not choose a model, including poller re-reviews.
+                  Used for every review that does not choose a model, including
+                  poller re-reviews.
                 </HelperTextItem>
+                {needsDefaultModel && (
+                  <HelperTextItem variant="warning" hasIcon>
+                    {selectedCredential?.name} is a gateway. Without a default
+                    model the agent CLI asks it for the CLI&apos;s own default
+                    model name, which the gateway may not serve or may map to
+                    another model. Set a model the gateway serves.
+                  </HelperTextItem>
+                )}
               </HelperText>
             </FormHelperText>
           </FormGroup>
-          <FormGroup label="Team review instructions" fieldId={id("instructions")}>
+          <FormGroup
+            label="Team review instructions"
+            fieldId={id("instructions")}
+          >
             <TextArea
               id={id("instructions")}
               value={instructions}
@@ -235,7 +277,11 @@ function AgentCard({
               placeholder="Conventions, priorities or checklists every review by this agent should follow."
             />
           </FormGroup>
-          <FormGroup label="Timeout (seconds)" isRequired fieldId={id("timeout")}>
+          <FormGroup
+            label="Timeout (seconds)"
+            isRequired
+            fieldId={id("timeout")}
+          >
             <TextInput
               id={id("timeout")}
               type="number"
@@ -254,7 +300,11 @@ function AgentCard({
             </FormHelperText>
           </FormGroup>
           <ActionGroup>
-            <Button type="submit" isLoading={busy} isDisabled={busy || !timeoutValid}>
+            <Button
+              type="submit"
+              isLoading={busy}
+              isDisabled={busy || !timeoutValid}
+            >
               Save
             </Button>
           </ActionGroup>
@@ -280,9 +330,17 @@ export function AgentsPage() {
         title="Assign each agent its default model, the models members may choose, and the credential it runs with."
         style={{ marginBottom: 16 }}
       />
-      {agents.error && <LoadError message={agents.error} onRetry={() => void agents.reload()} />}
+      {agents.error && (
+        <LoadError
+          message={agents.error}
+          onRetry={() => void agents.reload()}
+        />
+      )}
       {credentials.error && (
-        <LoadError message={credentials.error} onRetry={() => void credentials.reload()} />
+        <LoadError
+          message={credentials.error}
+          onRetry={() => void credentials.reload()}
+        />
       )}
       {agents.loading && !agents.data ? (
         <Loading />
@@ -297,7 +355,9 @@ export function AgentsPage() {
               credentials={credentials.data ?? []}
               onSaved={(saved) =>
                 agents.setData(
-                  (agents.data ?? []).map((x) => (x.agent === saved.agent ? saved : x)),
+                  (agents.data ?? []).map((x) =>
+                    x.agent === saved.agent ? saved : x,
+                  ),
                 )
               }
             />

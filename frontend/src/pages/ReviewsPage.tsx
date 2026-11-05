@@ -24,7 +24,7 @@ import { Empty, LoadError, Loading } from "../components/States";
 import { SubmitReviewForm } from "../components/SubmitReviewForm";
 import { useAsync, useInterval } from "../hooks";
 import { useToast } from "../toast";
-import { AGENT_LABELS, formatTime, isActive } from "../utils";
+import { AGENT_LABELS, formatTime, isActive, modelText } from "../utils";
 
 export function ReviewsPage() {
   const user = useUser();
@@ -189,7 +189,7 @@ export function ReviewsPage() {
                       <Td dataLabel="Agent / model">
                         {AGENT_LABELS[r.agent] ?? r.agent}
                         <div style={{ color: "var(--pf-v5-global--Color--200)" }}>
-                          {r.model ?? "default model"}
+                          {modelText(r)}
                         </div>
                       </Td>
                       <Td dataLabel="Status">

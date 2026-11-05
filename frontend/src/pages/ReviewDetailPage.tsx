@@ -28,7 +28,7 @@ import { Markdown } from "../components/Markdown";
 import { Empty, LoadError, Loading } from "../components/States";
 import { useAsync, useInterval } from "../hooks";
 import { useToast } from "../toast";
-import { AGENT_LABELS, formatCost, formatTime, isActive, shortSha } from "../utils";
+import { AGENT_LABELS, formatCost, formatTime, isActive, modelText, shortSha } from "../utils";
 
 export function ReviewDetailPage() {
   const { id } = useParams();
@@ -157,7 +157,7 @@ export function ReviewDetailPage() {
               {field("Base", r.base_ref ?? "-")}
               {field(
                 "Agent / model",
-                `${AGENT_LABELS[r.agent] ?? r.agent} / ${r.model ?? "default model"}`,
+                `${AGENT_LABELS[r.agent] ?? r.agent} / ${modelText(r)}`,
               )}
               {field("Cost", formatCost(r.cost_usd))}
               {field("Submitted by", r.submitted_by ?? (r.trigger === "poll" ? "poller" : "-"))}

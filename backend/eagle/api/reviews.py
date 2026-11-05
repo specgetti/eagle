@@ -111,7 +111,7 @@ async def create_review(
 ) -> ReviewDetail:
     try:
         ref = parse_pr_url(body.pr_url, await allowed_git_hosts(db, settings))
-        agent, model, post_comment = await resolve_review_options(
+        agent, model, model_source, post_comment = await resolve_review_options(
             db, ref.full_name, body.agent, body.model, body.post_comment
         )
     except (ValueError, ReviewOptionsError) as exc:
@@ -126,6 +126,7 @@ async def create_review(
         trigger=ReviewTrigger.MANUAL,
         agent=agent,
         model=model,
+        model_source=model_source,
         custom_prompt=body.custom_prompt,
         post_comment=post_comment,
         status=ReviewStatus.QUEUED,
@@ -140,6 +141,7 @@ async def create_review(
         details={
             "agent": agent,
             "model": model,
+            "model_source": model_source,
             "has_custom_prompt": body.custom_prompt is not None,
         },
     )
@@ -193,6 +195,7 @@ async def rerun_review(review_id: int, user: SubmitterUser, db: DbSession) -> Re
         previous_review_id=original.id,
         agent=original.agent,
         model=original.model,
+        model_source=original.model_source,
         custom_prompt=original.custom_prompt,
         post_comment=original.post_comment,
         status=ReviewStatus.QUEUED,

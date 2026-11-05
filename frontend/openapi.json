@@ -3506,6 +3506,28 @@
             ],
             "title": "Model"
           },
+          "model_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Source"
+          },
+          "reported_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Model"
+          },
           "post_comment": {
             "type": "boolean",
             "title": "Post Comment"
@@ -3806,6 +3828,28 @@
               }
             ],
             "title": "Model"
+          },
+          "model_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Source"
+          },
+          "reported_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Model"
           },
           "post_comment": {
             "type": "boolean",

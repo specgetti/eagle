@@ -75,8 +75,13 @@ async def resolve_review_options(
     agent: AgentKind | None,
     model: str | None,
     post_comment: bool | None,
-) -> tuple[AgentKind, str | None, bool]:
-    """Pick agent, model and comment posting from request, repo settings and defaults."""
+) -> tuple[AgentKind, str | None, str | None, bool]:
+    """Pick agent, model and comment posting from request, repo settings and defaults.
+
+    Returns (agent, model, model_source, post_comment). model_source says where
+    the model came from: "requested", "agent_default", or None when there is no
+    model and the agent CLI uses its own default.
+    """
     platform = await get_platform_settings(db)
     repo_settings = await matching_repo_settings(db, repo)
 
@@ -90,7 +95,10 @@ async def resolve_review_options(
     if config is None or not config.enabled:
         raise ReviewOptionsError(f"Agent {agent} is not enabled")
 
-    model = (model or "").strip() or config.default_model
+    model = (model or "").strip() or None
+    model_source = "requested" if model else None
+    if model is None and config.default_model:
+        model, model_source = config.default_model, "agent_default"
     if model and config.allowed_models and model not in config.allowed_models:
         raise ReviewOptionsError(
             f"Model {model!r} is not allowed for {agent}. "
@@ -102,7 +110,7 @@ async def resolve_review_options(
             (r.post_comment for r in reversed(repo_settings) if r.post_comment is not None), None
         )
         post_comment = repo_choice if repo_choice is not None else platform.post_comment_default
-    return agent, model, post_comment
+    return agent, model, model_source, post_comment
 
 
 async def allowed_git_hosts(db: AsyncSession, settings: Settings) -> list[str]:
@@ -151,6 +159,8 @@ async def apply_result(db: AsyncSession, review_id: int, result: dict[str, Any])
     """Store a runner result. Only applies to running reviews, so callbacks and the
     reaper cannot overwrite each other or a cancellation. Returns True if applied."""
     values: dict[str, Any] = {"finished_at": utcnow(), "callback_token_hash": None}
+    if result.get("model"):
+        values["reported_model"] = str(result["model"])[:128]
     if result.get("status") == "succeeded" and result.get("markdown"):
         values |= {
             "status": ReviewStatus.SUCCEEDED,

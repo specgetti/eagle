@@ -17,6 +17,17 @@ LINE_MAX = 300
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
 
+_MODEL_SOURCES = {"requested": "requested", "agent_default": "agent default"}
+
+
+def describe_model(model: str | None, source: str | None) -> str:
+    """'model glm-5 (agent default)', or the CLI default when no model is set."""
+    if not model:
+        return "the CLI's default model"
+    label = _MODEL_SOURCES.get(source or "")
+    return f"model {model}" + (f" ({label})" if label else "")
+
+
 def redact(text: str, secrets: list[str]) -> str:
     for secret in secrets:
         if secret and len(secret) >= 6:

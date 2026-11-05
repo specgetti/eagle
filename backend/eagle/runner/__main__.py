@@ -23,8 +23,9 @@ from eagle.runner.parse import (
     find_claude_result,
     parse_agent_output,
     parse_review,
+    reported_model,
 )
-from eagle.runner.progress import Progress, describe_claude_event, redact
+from eagle.runner.progress import Progress, describe_claude_event, describe_model, redact
 
 DEFAULT_SPEC_PATH = "/var/run/eagle/spec.json"
 OUTPUT_TAIL = 4000
@@ -208,7 +209,7 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
                 progress.log(f"{argv[0]}: {line}")
 
         model = _agent_model(argv, env)
-        progress.log(f"starting {argv[0]}" + (f" with model {model}" if model else ""))
+        progress.log(f"starting {argv[0]} with {describe_model(model, spec.get('model_source'))}")
         try:
             returncode, stdout, stderr = run_agent(
                 argv, invocation.get("stdin"), workdir, env, timeout, on_line
@@ -220,10 +221,17 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             progress.log(f"agent timed out after {timeout}s")
             return _failed(f"Agent timed out after {spec.get('timeout_seconds')}s")
         progress.log(f"{argv[0]} exited with code {returncode}")
+        used = reported_model(output_kind, stdout, stderr)
+        if used:
+            used = _redact(used, secrets)[:128]
+            progress.log(f"the agent reports it used model {used}")
+        else:
+            progress.log("the agent did not report which model it used")
 
         if returncode != 0:
             detail = _failure_detail(output_kind, stdout, stderr)
-            return _failed(_redact(f"Agent exited with code {returncode}: {detail}", secrets))
+            error = _redact(f"Agent exited with code {returncode}: {detail}", secrets)
+            return _failed(error, model=used)
 
         try:
             output = parse_agent_output(
@@ -232,7 +240,7 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             review = parse_review(output.text)
         except AgentOutputError as exc:
             progress.log(str(exc))
-            return _failed(_redact(str(exc), secrets))
+            return _failed(_redact(str(exc), secrets), model=used)
         progress.log(f"review parsed: verdict {review.verdict or 'none'}")
 
         return {
@@ -243,6 +251,7 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             "usage": output.usage,
             "cost_usd": output.cost_usd if invocation.get("report_cost", True) else None,
             "head_sha": head_sha,
+            "model": used,
         }
 
 
@@ -261,8 +270,11 @@ def _failure_detail(output_kind: str | None, stdout: str, stderr: str) -> str:
     return (stderr.strip() or stdout.strip())[-OUTPUT_TAIL:]
 
 
-def _failed(error: str) -> dict[str, Any]:
-    return {"status": "failed", "error": error}
+def _failed(error: str, model: str | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {"status": "failed", "error": error}
+    if model:
+        result["model"] = model
+    return result
 
 
 def deliver(spec: dict[str, Any], result: dict[str, Any]) -> None:

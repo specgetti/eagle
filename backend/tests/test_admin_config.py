@@ -218,15 +218,29 @@ async def test_agent_timeout_bounds(admin_client):
 
 
 async def test_review_uses_agent_default_model(admin_client):
+    # No default model: the agent CLI picks one, and the review says so.
+    review = (await admin_client.post("/api/v1/reviews", json={"pr_url": PR})).json()
+    assert (review["model"], review["model_source"], review["reported_model"]) == (None, None, None)
+
     await admin_client.put("/api/v1/agents/claude", json={"default_model": "claude-sonnet-5-5"})
     review = (await admin_client.post("/api/v1/reviews", json={"pr_url": PR})).json()
     assert review["agent"] == "claude"
     assert review["model"] == "claude-sonnet-5-5"
+    assert review["model_source"] == "agent_default"
 
     review = (
         await admin_client.post("/api/v1/reviews", json={"pr_url": PR, "model": "claude-haiku-5-5"})
     ).json()
     assert review["model"] == "claude-haiku-5-5"  # no allow list: any model
+    assert review["model_source"] == "requested"
+
+    # Picking the default model by name still counts as a choice.
+    review = (
+        await admin_client.post(
+            "/api/v1/reviews", json={"pr_url": PR, "model": "claude-sonnet-5-5"}
+        )
+    ).json()
+    assert review["model_source"] == "requested"
 
 
 async def test_review_model_must_be_in_allowed_list(admin_client):
