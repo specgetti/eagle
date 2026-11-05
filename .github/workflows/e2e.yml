@@ -48,18 +48,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free disk space (continues in the background)
-        # The images, their registry copies and the cluster's copies do not fit
-        # on a standard runner disk ("no space left on device"). Drop toolchains
-        # this job never uses. Deleting them takes about two minutes, so it runs
-        # while the next steps set up Go, kind and the builder; the preinstalled
-        # images are pruned first so the prune cannot race kind's node image.
+      - name: Free disk space
+        # The images, the registry copies and the cluster's copies do not fit on
+        # a standard runner disk ("no space left on device"). Drop toolchains this
+        # job never uses (about 25 GB, a few seconds). Pruning the preinstalled
+        # Docker images is not needed since builds push straight to the registry,
+        # and it took most of this step's time.
         run: |
           df -h / | tail -1
-          sudo docker image prune -af >/dev/null
-          sudo nohup rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost \
-            >/tmp/free-disk.log 2>&1 &
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost
+          df -h / | tail -1
 
       - uses: actions/setup-go@v5
         with:
