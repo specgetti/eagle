@@ -10,10 +10,16 @@ function setup(role: "member" | "admin" = "member") {
   let tokens: ApiToken[] = [];
   const mock = mockFetch({
     "GET /auth/me": () => makeUser({ role }),
-    "GET /auth/config": () => ({ local_login_enabled: true, oidc_enabled: false }),
+    "GET /auth/config": () => ({
+      local_login_enabled: true,
+      oidc_enabled: false,
+    }),
     "GET /tokens": () => tokens,
     "POST /tokens": (call) => {
-      const body = call.body as { name: string; expires_in_days: number | null };
+      const body = call.body as {
+        name: string;
+        expires_in_days: number | null;
+      };
       const token: ApiToken = {
         id: 1,
         name: body.name,
@@ -50,7 +56,10 @@ describe("API tokens", () => {
     expect(await screen.findByText("This is the only time the token is shown")).toBeInTheDocument();
     expect(screen.getByDisplayValue(SECRET)).toBeInTheDocument();
     const create = calls.find((c) => c.method === "POST" && c.path === "/tokens");
-    expect(create?.body).toEqual({ name: "github-actions", expires_in_days: null });
+    expect(create?.body).toEqual({
+      name: "github-actions",
+      expires_in_days: null,
+    });
 
     await user.click(screen.getByRole("button", { name: "Done" }));
     const row = (await screen.findByText("github-actions")).closest("tr")!;
@@ -71,5 +80,25 @@ describe("API tokens", () => {
     await waitFor(() =>
       expect(calls.some((c) => c.path === "/tokens" && c.query.get("all") === "true")).toBe(true),
     );
+  });
+
+  it("admin page creates a token for the admin and refreshes the list", async () => {
+    const user = userEvent.setup();
+    const { calls } = setup("admin");
+    renderApp("/admin/api-tokens");
+    expect(await screen.findByRole("link", { name: "Account" })).toHaveAttribute(
+      "href",
+      "/account",
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Create token for yourself" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/Name/), "admin-script");
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+    expect(await screen.findByDisplayValue(SECRET)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(await screen.findByText("admin-script")).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "POST" && c.path === "/tokens")).toHaveLength(1);
   });
 });

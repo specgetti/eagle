@@ -66,22 +66,15 @@ describe("SubmitReviewForm", () => {
     expect(model()).toHaveAttribute("placeholder", "Agent default");
 
     await user.selectOptions(agent, "claude");
-    expect(model()).toHaveAttribute(
-      "placeholder",
-      "Agent default: claude-sonnet-4-5",
-    );
-    expect(
-      screen.getByText(/use the agent default, claude-sonnet-4-5/),
-    ).toBeInTheDocument();
+    expect(model()).toHaveAttribute("placeholder", "Agent default: claude-sonnet-4-5");
+    expect(screen.getByText(/use the agent default, claude-sonnet-4-5/)).toBeInTheDocument();
 
     await user.selectOptions(agent, "opencode");
     expect(model()).toHaveAttribute("placeholder", "CLI default");
     expect(screen.getByText(/the agent CLI picks one/)).toBeInTheDocument();
 
     await user.selectOptions(agent, "codex");
-    expect(
-      screen.getByRole("option", { name: "Agent default (gpt-5)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Agent default (gpt-5)" })).toBeInTheDocument();
   });
 
   it("sends nulls for blank model, blank context and default post_comment", async () => {
@@ -89,10 +82,7 @@ describe("SubmitReviewForm", () => {
     const { calls, onSubmitted } = setup();
     await screen.findByRole("option", { name: "Claude Code" });
 
-    await user.type(
-      screen.getByLabelText(/Pull request URL/),
-      "https://github.com/org/repo/pull/1",
-    );
+    await user.type(screen.getByLabelText(/Pull request URL/), "https://github.com/org/repo/pull/1");
     await user.type(screen.getByLabelText(/Additional context/), "   ");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
 
@@ -111,28 +101,17 @@ describe("SubmitReviewForm", () => {
     const { calls, onSubmitted } = setup();
     await screen.findByRole("option", { name: /Codex/ });
 
-    await user.type(
-      screen.getByLabelText(/Pull request URL/),
-      "https://github.com/org/repo/pull/2",
-    );
+    await user.type(screen.getByLabelText(/Pull request URL/), "https://github.com/org/repo/pull/2");
     await user.selectOptions(screen.getByLabelText("Agent"), "codex");
     // Codex has no credential: warning label shown, allowed models become a select.
     expect(screen.getByText("No credential configured")).toBeInTheDocument();
     const model = screen.getByLabelText("Model");
     expect(model.tagName).toBe("SELECT");
-    expect(
-      screen.getByRole("option", { name: "Agent default (gpt-5)" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Agent default (gpt-5)" })).toBeInTheDocument();
     await user.selectOptions(model, "gpt-5-mini");
-    await user.type(
-      screen.getByLabelText(/Additional context/),
-      "Focus on db/",
-    );
+    await user.type(screen.getByLabelText(/Additional context/), "Focus on db/");
     expect(screen.getByText("12 / 8000 characters")).toBeInTheDocument();
-    await user.selectOptions(
-      screen.getByLabelText("Post review as PR comment"),
-      "yes",
-    );
+    await user.selectOptions(screen.getByLabelText("Post review as PR comment"), "yes");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
 
     await waitFor(() => expect(onSubmitted).toHaveBeenCalledTimes(1));
@@ -144,14 +123,8 @@ describe("SubmitReviewForm", () => {
       post_comment: true,
     });
 
-    await user.type(
-      screen.getByLabelText(/Pull request URL/),
-      "https://github.com/org/repo/pull/3",
-    );
-    await user.selectOptions(
-      screen.getByLabelText("Post review as PR comment"),
-      "no",
-    );
+    await user.type(screen.getByLabelText(/Pull request URL/), "https://github.com/org/repo/pull/3");
+    await user.selectOptions(screen.getByLabelText("Post review as PR comment"), "no");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
     await waitFor(() => expect(onSubmitted).toHaveBeenCalledTimes(2));
     expect(submitted(calls)[1].body).toMatchObject({ post_comment: false });
@@ -165,10 +138,7 @@ describe("SubmitReviewForm", () => {
     const model = screen.getByLabelText("Model");
     expect(model.tagName).toBe("INPUT");
     expect(model).toHaveAttribute("placeholder", "Agent default: claude-sonnet-4-5");
-    await user.type(
-      screen.getByLabelText(/Pull request URL/),
-      "https://github.com/org/repo/pull/4",
-    );
+    await user.type(screen.getByLabelText(/Pull request URL/), "https://github.com/org/repo/pull/4");
     await user.type(model, "  claude-opus-4-1 ");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
     await waitFor(() => expect(onSubmitted).toHaveBeenCalled());
@@ -190,13 +160,8 @@ describe("SubmitReviewForm", () => {
     });
     renderWithProviders(<SubmitReviewForm onSubmitted={vi.fn()} />);
     await screen.findByRole("option", { name: "Claude Code" });
-    await user.type(
-      screen.getByLabelText(/Pull request URL/),
-      "https://github.com/org/repo",
-    );
+    await user.type(screen.getByLabelText(/Pull request URL/), "https://github.com/org/repo");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
-    expect(
-      await screen.findByText("Not a pull request URL"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Not a pull request URL")).toBeInTheDocument();
   });
 });

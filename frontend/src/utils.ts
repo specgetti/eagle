@@ -30,11 +30,7 @@ export function describeReviewModel(
   r: Pick<Review, "model" | "model_source" | "reported_model" | "status">,
 ): { name: string; note: string | null } {
   const source =
-    r.model_source === "agent_default"
-      ? "agent default"
-      : r.model
-        ? null
-        : "CLI default";
+    r.model_source === "agent_default" ? "agent default" : r.model ? null : "CLI default";
   if (r.reported_model) {
     if (r.model && r.model !== r.reported_model) {
       return {
@@ -49,9 +45,7 @@ export function describeReviewModel(
   return { name: "CLI default", note: finished ? "model not reported" : null };
 }
 
-export function modelText(
-  r: Parameters<typeof describeReviewModel>[0],
-): string {
+export function modelText(r: Parameters<typeof describeReviewModel>[0]): string {
   const { name, note } = describeReviewModel(r);
   return note ? `${name} (${note})` : name;
 }
