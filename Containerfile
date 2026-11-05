@@ -12,6 +12,8 @@ FROM registry.access.redhat.com/ubi9/python-312:latest
 WORKDIR /opt/app-root/src
 RUN pip install --no-cache-dir uv
 COPY backend/pyproject.toml backend/uv.lock ./
+# Dependencies first, so a code change does not reinstall them (layer cache).
+RUN uv sync --no-dev --frozen --no-install-project
 COPY backend/eagle ./eagle
 RUN uv sync --no-dev --frozen
 COPY --from=ui /opt/app-root/src/dist ./ui

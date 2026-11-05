@@ -20,6 +20,10 @@ on:
         description: "Version this release upgrades from (keeps it in the catalog). Empty for the first release."
         required: false
         default: ""
+      force_e2e:
+        description: "Run the cluster test even if it already passed on this commit"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,12 +37,39 @@ env:
   REGISTRY_AUTH_FILE: ${{ github.workspace }}/.auth.json
 
 jobs:
-  # Nothing is published unless the full cluster test passes on this commit.
+  # Nothing is published unless the full cluster test passed on this commit:
+  # either an earlier e2e run (after the push to main) or the one started here.
+  tested:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      passed: ${{ steps.check.outputs.passed }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force_e2e }}
+        run: |
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/e2e.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1" --jq .total_count)
+          if [[ $FORCE != true && $runs -gt 0 ]]; then
+            echo "e2e already passed on $GITHUB_SHA; not running it again"
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   e2e:
+    needs: tested
+    if: needs.tested.outputs.passed != 'true'
     uses: ./.github/workflows/e2e.yml
 
   release:
-    needs: e2e
+    needs: [tested, e2e]
+    # e2e is skipped when it already passed on this commit.
+    if: >-
+      !cancelled() && needs.tested.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,14 +93,23 @@ jobs:
             -u "$REGISTRY_USERNAME" --password-stdin "${IMAGE_TAG_BASE%%/*}"
           mkdir -p ~/.docker && cp "$REGISTRY_AUTH_FILE" ~/.docker/config.json
 
-      - name: App and runner images
-        run: |
-          make images images-push PLATFORM=$PLATFORM TAG=v$VERSION \
-            IMAGE=$IMAGE_TAG_BASE/eagle RUNNER_IMAGE=$IMAGE_TAG_BASE/eagle-agent-runner
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Operator image
-        working-directory: operator
-        run: make docker-build docker-push PLATFORM=$PLATFORM IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION
+      - name: Expose the cache service to the build
+        uses: crazy-max/ghaction-github-runtime@v3
+
+      - name: App, runner and operator images
+        # Same Containerfiles and cache scopes as the e2e run, so layers it
+        # built are reused rather than rebuilt.
+        run: |
+          build() {
+            docker buildx build --platform "$PLATFORM" --provenance=false --push \
+              --cache-from "type=gha,scope=$1" --cache-to "type=gha,mode=max,scope=$1" \
+              -t "$IMAGE_TAG_BASE/$1:v$VERSION" -f "$3" "$2"
+          }
+          build eagle . Containerfile
+          build eagle-agent-runner . agent-runner/Containerfile
+          build eagle-operator operator operator/Dockerfile
 
       - name: Bundle
         working-directory: operator

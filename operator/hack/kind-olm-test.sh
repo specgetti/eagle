@@ -19,6 +19,9 @@
 #   SKIP_REVIEW=1         stop after the install checks
 #   PRUNE_AFTER_PUSH=1    delete local build output once images are in the registry
 #                         (CI disk space; never set this on a machine you care about)
+#   BUILDX_CACHE=gha      build the app, runner and operator images with docker buildx
+#                         and this BuildKit cache backend, pushing straight to the
+#                         registry (CI; the builder must reach localhost:5001 over http)
 # Needs kind, kubectl, Go and curl. Uses context kind-eagle and registry localhost:5001.
 set -euo pipefail
 
@@ -96,11 +99,33 @@ $CT network connect kind "$REG_NAME" 2>/dev/null || true
 $CT exec "${CLUSTER}-control-plane" sh -c "mkdir -p /etc/containerd/certs.d/${REG} && \
   printf '[host.\"http://${REG_NAME}:5000\"]\n' > /etc/containerd/certs.d/${REG}/hosts.toml"
 
+if [[ -n ${BUILDX_CACHE:-} ]]; then
+  # CI: BuildKit with a layer cache, pushing straight to the local registry (the
+  # builder needs host networking and http for $REG; see .github/workflows/e2e.yml).
+  build() {
+    local log start=$SECONDS
+    log=$(mktemp)
+    if ! docker buildx build --platform "$PLATFORM" --provenance=false --push --progress=plain \
+      --cache-from "type=$BUILDX_CACHE,scope=$1" --cache-to "type=$BUILDX_CACHE,mode=max,scope=$1" \
+      -t "$REG/$1:v$VERSION" -f "$3" "$2" >"$log" 2>&1; then
+      tail -60 "$log"
+      rm -f "$log"
+      return 1
+    fi
+    echo "$1: $((SECONDS - start))s, $(grep -c ' CACHED$' "$log" || true) cached steps"
+    rm -f "$log"
+  }
+else
+  build() {
+    $CT build -q --platform "$PLATFORM" -t "$REG/$1:v$VERSION" -f "$3" "$2" >/dev/null
+    push "$REG/$1:v$VERSION"
+  }
+fi
+
 step "Build and push images ($PLATFORM)"
-$CT build -q --platform "$PLATFORM" -t "$REG/eagle:v$VERSION" -f "$ROOT/Containerfile" "$ROOT" >/dev/null
-$CT build -q --platform "$PLATFORM" -t "$REG/eagle-agent-runner:v$VERSION" -f "$ROOT/agent-runner/Containerfile" "$ROOT" >/dev/null
-make -C "$OPERATOR" docker-build IMG="$REG/eagle-operator:v$VERSION" PLATFORM="$PLATFORM" CONTAINER_TOOL="$CT" >/dev/null
-for image in eagle eagle-agent-runner eagle-operator; do push "$REG/$image:v$VERSION"; done
+build eagle "$ROOT" "$ROOT/Containerfile"
+build eagle-agent-runner "$ROOT" "$ROOT/agent-runner/Containerfile"
+build eagle-operator "$OPERATOR" "$OPERATOR/Dockerfile"
 
 step "Bundle and catalog"
 make -C "$OPERATOR" bundle "${MAKE_VARS[@]}" | tail -1
@@ -116,6 +141,8 @@ if [[ ${PRUNE_AFTER_PUSH:-} == 1 ]]; then
     $CT rmi -f "$REG/$image:v$VERSION" >/dev/null 2>&1 || true
   done
   if [[ $CT == docker ]]; then docker builder prune -af >/dev/null; else podman image prune -f >/dev/null; fi
+  # The BuildKit builder keeps its own cache (already exported to the CI cache).
+  if [[ -n ${BUILDX_CACHE:-} ]]; then docker buildx prune -af >/dev/null; fi
   df -h / | tail -1
 fi
 
