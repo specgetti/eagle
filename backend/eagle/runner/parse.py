@@ -75,17 +75,9 @@ def reported_model(output_kind: str | None, stdout: str, stderr: str) -> str | N
     header it prints before running. OpenCode does not report it.
     """
     if output_kind == "claude_json":
-        for line in stdout.splitlines():
-            line = line.strip()
-            if not line.startswith("{"):
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+        for event in _json_events(stdout):
             if (
-                isinstance(event, dict)
-                and event.get("type") == "system"
+                event.get("type") == "system"
                 and event.get("subtype") == "init"
                 and isinstance(event.get("model"), str)
                 and event["model"]
@@ -97,6 +89,112 @@ def reported_model(output_kind: str | None, stdout: str, stderr: str) -> str | N
         if match:
             return match.group(1)
     return None
+
+
+MODEL_REPORT_MAX = 20
+# Claude Code labels messages it made up itself (errors, interrupts) this way.
+_SYNTHETIC_MODEL = "<synthetic>"
+
+
+def same_model(requested: str, served: str) -> bool:
+    """Whether a served model name is the requested one.
+
+    Endpoints often answer with a fuller id than the one requested: a dated
+    version (claude-sonnet-4-5 -> claude-sonnet-4-5-20250929, or @20250929 on
+    Vertex) or a provider prefix (glm-5 -> zai/glm-5). Those count as the same.
+    """
+    a, b = requested.strip().lower(), served.strip().lower()
+    if not a or not b:
+        return False
+    for x, y in ((a, b), (a.rsplit("/", 1)[-1], b.rsplit("/", 1)[-1])):
+        if x == y:
+            return True
+        short, full = sorted((x, y), key=len)
+        if full.startswith(short) and full[len(short)] in "-@:":
+            return True
+    return False
+
+
+def _json_events(stdout: str):
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict):
+            yield event
+
+
+def _int(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def claude_model_report(stdout: str) -> dict[str, Any] | None:
+    """Which models answered, from Claude Code's stream-json output.
+
+    "served": the model each API response says it came from (message.model,
+    set by the endpoint), with responses and tokens per model. Claude Code
+    prints one event per content block, so responses are counted by message id.
+    "usage_by_model": Claude Code's own per-model totals from the result event,
+    which also cover background requests that print no assistant event.
+    None when the output has neither.
+    """
+    served: dict[str, dict[str, Any]] = {}
+    seen: set[str] = set()
+    usage_by_model: list[dict[str, Any]] = []
+    for event in _json_events(stdout):
+        if event.get("type") == "assistant":
+            message = event.get("message") or {}
+            name = message.get("model") if isinstance(message, dict) else None
+            if not isinstance(name, str) or not name or name == _SYNTHETIC_MODEL:
+                continue
+            message_id = message.get("id")
+            if isinstance(message_id, str):
+                if message_id in seen:
+                    continue
+                seen.add(message_id)
+            name = name[:128]
+            entry = served.setdefault(
+                name, {"model": name, "responses": 0, "input_tokens": 0, "output_tokens": 0}
+            )
+            usage = message.get("usage") if isinstance(message.get("usage"), dict) else {}
+            entry["responses"] += 1
+            entry["input_tokens"] += sum(
+                _int(usage.get(k))
+                for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+            )
+            entry["output_tokens"] += _int(usage.get("output_tokens"))
+        elif event.get("type") == "result" and isinstance(event.get("modelUsage"), dict):
+            usage_by_model = [
+                {
+                    "model": str(name)[:128],
+                    "input_tokens": sum(
+                        _int(u.get(k))
+                        for k in (
+                            "inputTokens",
+                            "cacheReadInputTokens",
+                            "cacheCreationInputTokens",
+                        )
+                    ),
+                    "output_tokens": _int(u.get("outputTokens")),
+                }
+                for name, u in event["modelUsage"].items()
+                if isinstance(u, dict)
+            ]
+    if not served and not usage_by_model:
+        return None
+    return {
+        "served": _top(list(served.values())),
+        "usage_by_model": _top(usage_by_model),
+    }
+
+
+def _top(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The models that produced the most output first, at most MODEL_REPORT_MAX."""
+    return sorted(entries, key=lambda e: -e["output_tokens"])[:MODEL_REPORT_MAX]
 
 
 def _parse_claude(stdout: str) -> AgentOutput:

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fromTriState, modelText, parseApiTime, splitList, toTriState } from "./utils";
+import {
+  formatTokens,
+  fromTriState,
+  modelText,
+  modelTokensText,
+  parseApiTime,
+  splitList,
+  toTriState,
+} from "./utils";
 
 describe("utils", () => {
   it("treats zone-less API timestamps as UTC", () => {
@@ -31,6 +39,16 @@ describe("utils", () => {
     expect(r(null, null, null, "running" as never)).toBe("CLI default");
     // Reviews from before model_source existed.
     expect(r("m-1", null, null)).toBe("m-1");
+  });
+
+  it("formats token counts and per-model usage", () => {
+    expect([999, 41234, 1_500_000, 2_000_000].map(formatTokens)).toEqual(["999", "41k", "1.5M", "2M"]);
+    expect(
+      modelTokensText([
+        { model: "a", responses: 1, input_tokens: 10, output_tokens: 2 },
+        { model: "b" },
+      ]),
+    ).toBe("a (1 response, 10 in / 2 out); b");
   });
 
   it("splits comma lists", () => {

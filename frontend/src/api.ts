@@ -71,6 +71,21 @@ export interface AgentOption {
   configured: boolean;
 }
 
+export interface ModelTokens {
+  model: string;
+  responses?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+}
+
+/** Which models answered a review, from the agent's output. */
+export interface ModelReport {
+  /** The model each API response said it came from (set by the endpoint). */
+  served: ModelTokens[];
+  /** The agent's own per-model totals, including background requests. */
+  usage_by_model: ModelTokens[];
+}
+
 export interface Review {
   id: number;
   pr_url: string;
@@ -89,6 +104,9 @@ export interface Review {
   model_source: string | null;
   /** The model the agent said it used, when it says. */
   reported_model: string | null;
+  model_report: ModelReport | null;
+  /** A response came from a model other than the requested one. */
+  model_mismatch: boolean;
   post_comment: boolean;
   status: ReviewStatus;
   summary: string | null;

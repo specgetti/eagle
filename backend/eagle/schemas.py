@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from eagle.models import AgentKind, ChannelKind, CredentialKind, ReviewStatus, ReviewTrigger, Role
+from eagle.runner.parse import same_model
 
 CUSTOM_PROMPT_MAX_LENGTH = 8000
 INSTRUCTIONS_MAX_LENGTH = 20000
@@ -105,6 +106,22 @@ class ReviewCreate(BaseModel):
         return value.strip() or None
 
 
+class ModelTokens(BaseModel):
+    model: str = Field(max_length=128)
+    responses: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
+class ModelReport(BaseModel):
+    """Which models answered a review, from the agent's output."""
+
+    # The model each API response said it came from (set by the endpoint).
+    served: list[ModelTokens] = Field(default_factory=list, max_length=20)
+    # The agent's own per-model totals, including background requests.
+    usage_by_model: list[ModelTokens] = Field(default_factory=list, max_length=20)
+
+
 class ReviewOut(ORM):
     id: int
     pr_url: str
@@ -121,6 +138,7 @@ class ReviewOut(ORM):
     model: str | None
     model_source: str | None = None
     reported_model: str | None = None
+    model_report: ModelReport | None = None
     post_comment: bool
     status: ReviewStatus
     summary: str | None
@@ -132,6 +150,16 @@ class ReviewOut(ORM):
     started_at: datetime | None
     finished_at: datetime | None
     submitted_by: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def model_mismatch(self) -> bool:
+        """True when a response came from a model other than the requested one
+        (or, with no model requested, the one the agent CLI said it would use)."""
+        expected = self.model or self.reported_model
+        if not expected or self.model_report is None:
+            return False
+        return any(not same_model(expected, e.model) for e in self.model_report.served)
 
 
 class ReviewDetail(ReviewOut):
@@ -158,6 +186,7 @@ class RunnerResult(BaseModel):
     head_sha: str | None = Field(default=None, max_length=64)
     # The model the agent reported using, when its output says.
     model: str | None = Field(default=None, max_length=128)
+    model_report: ModelReport | None = None
     error: str | None = Field(default=None, max_length=20000)
 
 

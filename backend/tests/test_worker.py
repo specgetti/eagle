@@ -1,5 +1,6 @@
 """Worker lifecycle tests with the mock executor and fake GitHub/Slack/SMTP."""
 
+import pytest
 from sqlalchemy import select, update
 
 from eagle.executors.base import RUNNING, Executor, RunState
@@ -418,3 +419,56 @@ async def test_rerun_keeps_the_model_source(admin_client):
     rerun = await admin_client.post(f"/api/v1/reviews/{review['id']}/rerun")
     assert rerun.status_code == 201, rerun.text
     assert (rerun.json()["model"], rerun.json()["model_source"]) == ("glm-5", "agent_default")
+
+
+@pytest.mark.parametrize(
+    ("served", "mismatch"),
+    [
+        (["glm-5"], False),
+        (["glm-5-20260101"], False),  # a dated id of the requested model
+        (["glm-5", "qwen-3-coder"], True),
+        ([], False),
+    ],
+)
+async def test_model_report_and_mismatch_flag(
+    admin_client, client, make_worker, settings, served, mismatch
+):
+    executor = CallbackExecutor()
+    worker = make_worker(executor)
+    review = await submit(admin_client, model="glm-5")
+    await worker.dispatch()
+    callback = executor.callbacks[f"job-{review['id']}"]
+    report = {
+        "served": [
+            {"model": m, "responses": 2, "input_tokens": 10, "output_tokens": 5} for m in served
+        ],
+        "usage_by_model": [{"model": "glm-5", "input_tokens": 20, "output_tokens": 10}],
+    }
+    resp = await client.post(
+        callback["url"].removeprefix(settings.callback_base_url),
+        json={"status": "succeeded", "markdown": "ok", "model": "glm-5", "model_report": report},
+        headers={"Authorization": f"Bearer {callback['token']}"},
+    )
+    assert resp.status_code == 204, resp.text
+    final = await get(admin_client, review["id"])
+    assert final["model_report"]["served"] == report["served"]
+    assert final["model_mismatch"] is mismatch
+    listed = (await admin_client.get("/api/v1/reviews")).json()["items"]
+    assert next(r for r in listed if r["id"] == review["id"])["model_mismatch"] is mismatch
+
+
+async def test_runner_result_rejects_an_oversized_model_report(
+    admin_client, client, make_worker, settings
+):
+    executor = CallbackExecutor()
+    worker = make_worker(executor)
+    review = await submit(admin_client)
+    await worker.dispatch()
+    callback = executor.callbacks[f"job-{review['id']}"]
+    report = {"served": [{"model": f"m{i}"} for i in range(21)]}
+    resp = await client.post(
+        callback["url"].removeprefix(settings.callback_base_url),
+        json={"status": "succeeded", "markdown": "ok", "model_report": report},
+        headers={"Authorization": f"Bearer {callback['token']}"},
+    )
+    assert resp.status_code == 422

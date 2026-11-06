@@ -6,6 +6,7 @@ import {
   CardBody,
   FormSelect,
   FormSelectOption,
+  Label,
   Pagination,
   PageSection,
   SearchInput,
@@ -190,6 +191,14 @@ export function ReviewsPage() {
                         {AGENT_LABELS[r.agent] ?? r.agent}
                         <div style={{ color: "var(--pf-v5-global--Color--200)" }}>
                           {modelText(r)}
+                          {r.model_mismatch && (
+                            <>
+                              {" "}
+                              <Label color="orange" isCompact>
+                                model mismatch
+                              </Label>
+                            </>
+                          )}
                         </div>
                       </Td>
                       <Td dataLabel="Status">

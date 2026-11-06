@@ -20,10 +20,12 @@ from typing import Any
 
 from eagle.runner.parse import (
     AgentOutputError,
+    claude_model_report,
     find_claude_result,
     parse_agent_output,
     parse_review,
     reported_model,
+    same_model,
 )
 from eagle.runner.progress import Progress, describe_claude_event, describe_model, redact
 
@@ -227,11 +229,15 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             progress.log(f"the agent reports it used model {used}")
         else:
             progress.log("the agent did not report which model it used")
+        report = claude_model_report(stdout) if output_kind == "claude_json" else None
+        if report:
+            _log_served(progress, report, model or used)
+        extra = {"model": used, "model_report": report}
 
         if returncode != 0:
             detail = _failure_detail(output_kind, stdout, stderr)
             error = _redact(f"Agent exited with code {returncode}: {detail}", secrets)
-            return _failed(error, model=used)
+            return _failed(error, **extra)
 
         try:
             output = parse_agent_output(
@@ -240,7 +246,7 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             review = parse_review(output.text)
         except AgentOutputError as exc:
             progress.log(str(exc))
-            return _failed(_redact(str(exc), secrets), model=used)
+            return _failed(_redact(str(exc), secrets), **extra)
         progress.log(f"review parsed: verdict {review.verdict or 'none'}")
 
         return {
@@ -251,8 +257,26 @@ def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any
             "usage": output.usage,
             "cost_usd": output.cost_usd if invocation.get("report_cost", True) else None,
             "head_sha": head_sha,
-            "model": used,
+            **extra,
         }
+
+
+def _log_served(progress: Progress, report: dict[str, Any], expected: str | None) -> None:
+    """Which models the endpoint says answered, and a warning if any is unexpected."""
+    served = report.get("served") or []
+    if not served:
+        return
+    progress.log(
+        "the endpoint answered as "
+        + ", ".join(
+            f"{e['model']} ({e['responses']} response{'' if e['responses'] == 1 else 's'})"
+            for e in served
+        )
+    )
+    others = [e["model"] for e in served if expected and not same_model(expected, e["model"])]
+    if others:
+        names = ", ".join(others)
+        progress.log(f"WARNING: {expected} was requested, but responses came from {names}")
 
 
 def _failure_detail(output_kind: str | None, stdout: str, stderr: str) -> str:
@@ -270,10 +294,9 @@ def _failure_detail(output_kind: str | None, stdout: str, stderr: str) -> str:
     return (stderr.strip() or stdout.strip())[-OUTPUT_TAIL:]
 
 
-def _failed(error: str, model: str | None = None) -> dict[str, Any]:
+def _failed(error: str, **extra: Any) -> dict[str, Any]:
     result: dict[str, Any] = {"status": "failed", "error": error}
-    if model:
-        result["model"] = model
+    result.update({k: v for k, v in extra.items() if v})
     return result
 
 

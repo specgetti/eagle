@@ -24,7 +24,10 @@ Eagle runs on OpenShift and is installed and managed by its own operator.
   optional PR comment. Re-run, cancel, filter, and incremental re-reviews of new
   commits by the PR poller (off by default). Each review shows the model the
   agent reported using and where it came from (picked, agent default, or the
-  CLI's own default).
+  CLI's own default). For Claude Code it also records which model each API
+  response says it came from, with tokens per model, and flags a review when an
+  endpoint answered as a model that was not requested. That is the endpoint's
+  own claim; a gateway's usage logs are the authoritative record.
 - **Agents**: Claude Code, Codex and OpenCode, each with a credential, a default
   model, the models members may pick, team instructions and a timeout.
 - **Model access**: Anthropic API key, Claude subscription token, Vertex AI,

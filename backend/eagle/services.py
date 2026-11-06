@@ -161,6 +161,8 @@ async def apply_result(db: AsyncSession, review_id: int, result: dict[str, Any])
     values: dict[str, Any] = {"finished_at": utcnow(), "callback_token_hash": None}
     if result.get("model"):
         values["reported_model"] = str(result["model"])[:128]
+    if result.get("model_report"):
+        values["model_report"] = result["model_report"]
     if result.get("status") == "succeeded" and result.get("markdown"):
         values |= {
             "status": ReviewStatus.SUCCEEDED,

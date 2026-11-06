@@ -291,6 +291,12 @@ EOF
   api $B/reviews/$rid | json '"status=%s verdict=%s head=%s\nsummary=%s\nerror=%s" % (d["status"], d["verdict"], (d["head_sha"] or "")[:12], d["summary"], d["error"])'
   [[ $status == succeeded ]] || fail "review ended as $status"
   [[ $(api $B/reviews/$rid | json 'd["verdict"]') == approve ]] || fail "review has no verdict"
+  # The real CLI's output names the model each response came from (the fake API
+  # answers as the model it was asked for), so the review records it, unflagged.
+  api $B/reviews/$rid | json '"model: requested=%s (%s) reported=%s served=%s mismatch=%s" % (d["model"], d["model_source"], d["reported_model"], [e["model"] for e in (d["model_report"] or {}).get("served", [])], d["model_mismatch"])'
+  served=$(api $B/reviews/$rid | json '",".join(e["model"] for e in (d["model_report"] or {}).get("served", []))')
+  [[ $served == fake-model ]] || fail "the review did not record the served model (got '$served')"
+  [[ $(api $B/reviews/$rid | json 'd["model_mismatch"]') == False ]] || fail "model mismatch flagged"
   for _ in $(seq 1 12); do
     left=$($KCTL get secrets -n eagle -l app.kubernetes.io/component=eagle-runner -o name | wc -l | tr -d ' ')
     [[ $left == 0 ]] && break

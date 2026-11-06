@@ -28,7 +28,15 @@ import { Markdown } from "../components/Markdown";
 import { Empty, LoadError, Loading } from "../components/States";
 import { useAsync, useInterval } from "../hooks";
 import { useToast } from "../toast";
-import { AGENT_LABELS, formatCost, formatTime, isActive, modelText, shortSha } from "../utils";
+import {
+  AGENT_LABELS,
+  formatCost,
+  formatTime,
+  isActive,
+  modelText,
+  modelTokensText,
+  shortSha,
+} from "../utils";
 
 export function ReviewDetailPage() {
   const { id } = useParams();
@@ -146,6 +154,18 @@ export function ReviewDetailPage() {
             style={{ marginBottom: 16 }}
           />
         )}
+        {r.model_mismatch && r.model_report && (
+          <Alert
+            variant="warning"
+            isInline
+            title="The endpoint answered with a model that was not requested"
+            style={{ marginBottom: 16 }}
+          >
+            Requested {r.model ?? r.reported_model}, but the responses say they came from{" "}
+            {modelTokensText(r.model_report.served)}. The endpoint may map model names to other
+            models; check its usage logs.
+          </Alert>
+        )}
         <Card style={{ marginBottom: 16 }}>
           <CardBody>
             <DescriptionList
@@ -159,6 +179,13 @@ export function ReviewDetailPage() {
                 "Agent / model",
                 `${AGENT_LABELS[r.agent] ?? r.agent} / ${modelText(r)}`,
               )}
+              {r.model_report && r.model_report.served.length > 0 &&
+                field("Answered by (per the endpoint)", modelTokensText(r.model_report.served))}
+              {r.model_report && r.model_report.usage_by_model.length > 1 &&
+                field(
+                  "Usage by model (per the agent)",
+                  modelTokensText(r.model_report.usage_by_model),
+                )}
               {field("Cost", formatCost(r.cost_usd))}
               {field("Submitted by", r.submitted_by ?? (r.trigger === "poll" ? "poller" : "-"))}
               {field("Submitted", formatTime(r.created_at))}

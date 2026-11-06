@@ -237,6 +237,9 @@ class Review(Base):
     # The model the agent said it used, from its own output (Claude Code's init event,
     # the Codex header). None when the agent does not report it.
     reported_model: Mapped[str | None] = mapped_column(String(128))
+    # Which models the endpoint said answered, with tokens (eagle.runner.parse.
+    # claude_model_report): {"served": [...], "usage_by_model": [...]}.
+    model_report: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     # Optional extra context from the submitter, appended to the review instructions.
     custom_prompt: Mapped[str | None] = mapped_column(Text)
     post_comment: Mapped[bool] = mapped_column(default=False)

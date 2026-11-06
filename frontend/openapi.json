@@ -3172,6 +3172,76 @@
         ],
         "title": "ModelListOut"
       },
+      "ModelReport": {
+        "properties": {
+          "served": {
+            "items": {
+              "$ref": "#/components/schemas/ModelTokens"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Served"
+          },
+          "usage_by_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelTokens"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Usage By Model"
+          }
+        },
+        "type": "object",
+        "title": "ModelReport",
+        "description": "Which models answered a review, from the agent's output."
+      },
+      "ModelTokens": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Model"
+          },
+          "responses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responses"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "ModelTokens"
+      },
       "OIDCConfigOut": {
         "properties": {
           "enabled": {
@@ -3528,6 +3598,16 @@
             ],
             "title": "Reported Model"
           },
+          "model_report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "post_comment": {
             "type": "boolean",
             "title": "Post Comment"
@@ -3699,6 +3779,12 @@
               }
             ],
             "title": "Delivery Errors"
+          },
+          "model_mismatch": {
+            "type": "boolean",
+            "title": "Model Mismatch",
+            "description": "True when a response came from a model other than the requested one\n(or, with no model requested, the one the agent CLI said it would use).",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -3731,7 +3817,8 @@
           "base_ref",
           "result_markdown",
           "token_usage",
-          "delivery_errors"
+          "delivery_errors",
+          "model_mismatch"
         ],
         "title": "ReviewDetail"
       },
@@ -3851,6 +3938,16 @@
             ],
             "title": "Reported Model"
           },
+          "model_report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "post_comment": {
             "type": "boolean",
             "title": "Post Comment"
@@ -3952,6 +4049,12 @@
               }
             ],
             "title": "Submitted By"
+          },
+          "model_mismatch": {
+            "type": "boolean",
+            "title": "Model Mismatch",
+            "description": "True when a response came from a model other than the requested one\n(or, with no model requested, the one the agent CLI said it would use).",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -3978,7 +4081,8 @@
           "posted_comment_url",
           "created_at",
           "started_at",
-          "finished_at"
+          "finished_at",
+          "model_mismatch"
         ],
         "title": "ReviewOut"
       },

@@ -11,9 +11,11 @@ import pytest
 from eagle.runner import __main__ as runner
 from eagle.runner.parse import (
     AgentOutputError,
+    claude_model_report,
     parse_agent_output,
     parse_review,
     reported_model,
+    same_model,
 )
 from eagle.runner.progress import Progress, describe_claude_event, describe_model
 from tests.fakes import FAKE_CLAUDE, make_fake_cli
@@ -524,3 +526,90 @@ sys.exit(1)
     assert result["status"] == "failed"
     assert result["model"] == "claude-sonnet-4-5"
     assert "model not found" in result["error"]
+
+
+def _assistant(message_id, model, text="x", **usage):
+    return {
+        "type": "assistant",
+        "message": {
+            "id": message_id,
+            "model": model,
+            "content": [{"type": "text", "text": text}],
+            "usage": usage,
+        },
+    }
+
+
+SERVED_EVENTS = [
+    {"type": "system", "subtype": "init", "model": "glm-5"},
+    # One response printed as two events (one per content block): counted once.
+    _assistant("m1", "glm-5", input_tokens=100, cache_read_input_tokens=50, output_tokens=10),
+    _assistant("m1", "glm-5", input_tokens=100, cache_read_input_tokens=50, output_tokens=10),
+    _assistant("m2", "qwen-3-coder", input_tokens=200, output_tokens=40),
+    _assistant("m3", "<synthetic>", text="API Error"),
+    {
+        "type": "result",
+        "is_error": False,
+        "result": "Looks fine.\n\nVERDICT: approve",
+        "modelUsage": {
+            "glm-5": {"inputTokens": 150, "outputTokens": 10, "cacheReadInputTokens": 50},
+            "claude-haiku-4-5": {"inputTokens": 30, "outputTokens": 5},
+        },
+    },
+]
+
+
+def test_claude_model_report_counts_responses_and_tokens():
+    stdout = "\n".join(json.dumps(e) for e in SERVED_EVENTS)
+    assert claude_model_report(stdout) == {
+        "served": [
+            {"model": "qwen-3-coder", "responses": 1, "input_tokens": 200, "output_tokens": 40},
+            {"model": "glm-5", "responses": 1, "input_tokens": 150, "output_tokens": 10},
+        ],
+        "usage_by_model": [
+            {"model": "glm-5", "input_tokens": 200, "output_tokens": 10},
+            {"model": "claude-haiku-4-5", "input_tokens": 30, "output_tokens": 5},
+        ],
+    }
+    assert claude_model_report('{"type":"result","result":"x"}\nnot json') is None
+
+
+@pytest.mark.parametrize(
+    ("requested", "served", "same"),
+    [
+        ("glm-5", "glm-5", True),
+        ("GLM-5", "glm-5", True),
+        ("claude-sonnet-4-5", "claude-sonnet-4-5-20250929", True),
+        ("claude-sonnet-4-5", "claude-sonnet-4-5@20250929", True),
+        ("glm-5", "zai/glm-5", True),
+        ("openai/gpt-5", "gpt-5", True),
+        ("glm-5", "glm-5.3", False),
+        ("glm-5", "qwen-3-coder", False),
+        ("claude-sonnet-4-5", "claude-haiku-4-5", False),
+        ("", "glm-5", False),
+    ],
+)
+def test_same_model(requested, served, same):
+    assert same_model(requested, served) is same
+
+
+def test_runner_warns_when_responses_come_from_another_model(pr_repo, tmp_path, fake_bin):
+    make_fake_cli(
+        fake_bin,
+        "claude",
+        f"""
+import json, sys
+sys.stdin.read()
+for event in json.loads({json.dumps(json.dumps(SERVED_EVENTS))}):
+    print(json.dumps(event), flush=True)
+""",
+    )
+    spec = claude_spec(pr_repo, tmp_path)
+    spec["invocation"]["argv"] = ["claude", "-p", "--model", "glm-5"]
+    out = io.StringIO()
+    result = runner.run(spec, progress=Progress([], out=out))
+    assert result["status"] == "succeeded", result
+    assert [e["model"] for e in result["model_report"]["served"]] == ["qwen-3-coder", "glm-5"]
+    log = out.getvalue()
+    assert "the endpoint answered as qwen-3-coder (1 response), glm-5 (1 response)" in log
+    assert "WARNING: glm-5 was requested, but responses came from qwen-3-coder" in log

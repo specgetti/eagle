@@ -1,4 +1,4 @@
-import { AgentKind, CredentialKind, Review, ReviewStatus } from "./api";
+import { AgentKind, CredentialKind, ModelTokens, Review, ReviewStatus } from "./api";
 
 export const AGENT_LABELS: Record<AgentKind, string> = {
   claude: "Claude Code",
@@ -48,6 +48,28 @@ export function describeReviewModel(
 export function modelText(r: Parameters<typeof describeReviewModel>[0]): string {
   const { name, note } = describeReviewModel(r);
   return note ? `${name} (${note})` : name;
+}
+
+/** 41234 -> "41k", 1500000 -> "1.5M". */
+export function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
+/** "glm-5 (12 responses, 41k in / 3k out)" for each model, joined. */
+export function modelTokensText(entries: ModelTokens[]): string {
+  return entries
+    .map((e) => {
+      const parts = [];
+      if (e.responses) parts.push(`${e.responses} response${e.responses === 1 ? "" : "s"}`);
+      if (e.input_tokens || e.output_tokens) {
+        const tokensIn = formatTokens(e.input_tokens ?? 0);
+        parts.push(`${tokensIn} in / ${formatTokens(e.output_tokens ?? 0)} out`);
+      }
+      return parts.length ? `${e.model} (${parts.join(", ")})` : e.model;
+    })
+    .join("; ");
 }
 
 /**
