@@ -168,9 +168,23 @@ def _agent_model(argv: list[str], env: dict[str, str]) -> str | None:
     return env.get("ANTHROPIC_MODEL")
 
 
+def _is_public_env(name: str) -> bool:
+    """Agent environment variables that hold model names, not secrets.
+
+    Every other value in the agent's environment is redacted from logs and
+    results. Model names must not be: the agent reports the model it uses, and
+    hiding it would replace it with *** (ANTHROPIC_MODEL for gateways).
+    """
+    return name.endswith("_MODEL")
+
+
 def run(spec: dict[str, Any], progress: Progress | None = None) -> dict[str, Any]:
     invocation = spec["invocation"]
-    secrets = [v for v in invocation.get("env", {}).values() if isinstance(v, str)]
+    secrets = [
+        v
+        for k, v in invocation.get("env", {}).items()
+        if isinstance(v, str) and not _is_public_env(k)
+    ]
     if spec["repo"].get("token"):
         secrets.append(spec["repo"]["token"])
     progress = progress or Progress(secrets)

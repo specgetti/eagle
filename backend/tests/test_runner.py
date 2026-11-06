@@ -613,3 +613,57 @@ for event in json.loads({json.dumps(json.dumps(SERVED_EVENTS))}):
     log = out.getvalue()
     assert "the endpoint answered as qwen-3-coder (1 response), glm-5 (1 response)" in log
     assert "WARNING: glm-5 was requested, but responses came from qwen-3-coder" in log
+
+
+def test_model_names_in_the_agent_env_are_not_redacted(pr_repo, tmp_path, fake_bin):
+    # Gateway credentials put the model in ANTHROPIC_MODEL; it must still show.
+    make_fake_cli(
+        fake_bin,
+        "claude",
+        """
+import json, sys
+sys.stdin.read()
+print(json.dumps({"type": "system", "subtype": "init", "model": "glm-5.3"}))
+print(json.dumps({"type": "result", "is_error": False,
+                  "result": "Uses key sk-gateway-key-999. VERDICT: approve"}))
+""",
+    )
+    spec = claude_spec(pr_repo, tmp_path)
+    spec["invocation"]["argv"] = ["claude", "-p"]
+    spec["invocation"]["env"] = {
+        "ANTHROPIC_AUTH_TOKEN": "sk-gateway-key-999",
+        "ANTHROPIC_BASE_URL": "https://maas.example.com",
+        "ANTHROPIC_MODEL": "glm-5.3",
+        "ANTHROPIC_SMALL_FAST_MODEL": "glm-5.3",
+    }
+    out = io.StringIO()
+    secrets = [v for k, v in spec["invocation"]["env"].items() if not k.endswith("_MODEL")]
+    result = runner.run(spec, progress=Progress(secrets, out=out))
+    assert result["status"] == "succeeded", result
+    assert result["model"] == "glm-5.3"
+    assert "sk-gateway-key-999" not in result["markdown"]
+    log = out.getvalue()
+    assert "starting claude with model glm-5.3" in log
+    assert "Claude Code started: model glm-5.3" in log
+    assert "the agent reports it used model glm-5.3" in log
+    assert "sk-gateway-key-999" not in log
+
+
+def test_runner_redacts_every_env_value_except_model_names(
+    pr_repo, tmp_path, fake_bin, monkeypatch
+):
+    make_fake_cli(fake_bin, "claude", FAKE_CLAUDE)
+    spec = claude_spec(pr_repo, tmp_path)
+    spec["invocation"]["env"] |= {"ANTHROPIC_MODEL": "glm-5.3", "OTHER": "private-value"}
+    captured = {}
+    real = runner.Progress
+
+    def spy(secrets, *args, **kwargs):
+        captured["secrets"] = list(secrets)
+        return real(secrets, *args, **kwargs)
+
+    monkeypatch.setattr(runner, "Progress", spy)
+    runner.run(spec)
+    assert "private-value" in captured["secrets"]
+    assert "sk-test-key-123" in captured["secrets"]
+    assert "glm-5.3" not in captured["secrets"]

@@ -105,14 +105,21 @@ if [[ -n ${BUILDX_CACHE:-} ]]; then
   build() {
     local log start=$SECONDS
     log=$(mktemp)
+    # ignore-error: a slow or failing cache service must not fail the build.
     if ! docker buildx build --platform "$PLATFORM" --provenance=false --push --progress=plain \
-      --cache-from "type=$BUILDX_CACHE,scope=$1" --cache-to "type=$BUILDX_CACHE,mode=max,scope=$1" \
+      --cache-from "type=$BUILDX_CACHE,scope=$1" \
+      --cache-to "type=$BUILDX_CACHE,mode=max,scope=$1,ignore-error=true" \
       -t "$REG/$1:v$VERSION" -f "$3" "$2" >"$log" 2>&1; then
       tail -60 "$log"
       rm -f "$log"
       return 1
     fi
     echo "$1: $((SECONDS - start))s, $(grep -c ' CACHED$' "$log" || true) cached steps"
+    # A slow build: show where the time went (BuildKit prints each step's duration).
+    if ((SECONDS - start > 120)); then
+      echo "---- $1 build log (last 40 lines)"
+      tail -40 "$log"
+    fi
     rm -f "$log"
   }
 else
@@ -297,6 +304,9 @@ EOF
   served=$(api $B/reviews/$rid | json '",".join(e["model"] for e in (d["model_report"] or {}).get("served", []))')
   [[ $served == fake-model ]] || fail "the review did not record the served model (got '$served')"
   [[ $(api $B/reviews/$rid | json 'd["model_mismatch"]') == False ]] || fail "model mismatch flagged"
+  # The model is also in the agent's env (ANTHROPIC_MODEL); it must not be redacted.
+  reported=$(api $B/reviews/$rid | json 'd["reported_model"]')
+  [[ $reported == fake-model ]] || fail "reported model is '$reported', not fake-model"
   for _ in $(seq 1 12); do
     left=$($KCTL get secrets -n eagle -l app.kubernetes.io/component=eagle-runner -o name | wc -l | tr -d ' ')
     [[ $left == 0 ]] && break

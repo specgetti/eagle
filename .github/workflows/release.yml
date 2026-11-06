@@ -104,7 +104,8 @@ jobs:
         run: |
           build() {
             docker buildx build --platform "$PLATFORM" --provenance=false --push \
-              --cache-from "type=gha,scope=$1" --cache-to "type=gha,mode=max,scope=$1" \
+              --cache-from "type=gha,scope=$1" \
+              --cache-to "type=gha,mode=max,scope=$1,ignore-error=true" \
               -t "$IMAGE_TAG_BASE/$1:v$VERSION" -f "$3" "$2"
           }
           build eagle . Containerfile
