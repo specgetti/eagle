@@ -35,7 +35,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     operators.operatorframework.io/builder: operator-sdk-v1.42.3
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-    repository: https://github.com/hmoghani/eagle
+    repository: https://github.com/specgetti/eagle
     support: hmoghani
   name: eagle-operator.v0.1.0
   namespace: placeholder
@@ -646,7 +646,7 @@ spec:
   - codex
   links:
   - name: Source
-    url: https://github.com/hmoghani/eagle
+    url: https://github.com/specgetti/eagle
   maintainers:
   - email: hmoghani@gmail.com
     name: hmoghani

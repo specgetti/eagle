@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
-	eaglev1alpha1 "github.com/hmoghani/eagle/operator/api/v1alpha1"
+	eaglev1alpha1 "github.com/specgetti/eagle/operator/api/v1alpha1"
 )
 
 // Builders in this file are pure: they take the CR (plus already resolved

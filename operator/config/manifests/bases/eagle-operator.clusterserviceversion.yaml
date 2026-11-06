@@ -15,7 +15,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    repository: https://github.com/hmoghani/eagle
+    repository: https://github.com/specgetti/eagle
     support: hmoghani
   name: eagle-operator.v0.0.0
   namespace: placeholder
@@ -378,7 +378,7 @@ spec:
   - codex
   links:
   - name: Source
-    url: https://github.com/hmoghani/eagle
+    url: https://github.com/specgetti/eagle
   maintainers:
   - email: hmoghani@gmail.com
     name: hmoghani

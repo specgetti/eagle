@@ -3,7 +3,7 @@ package controller
 import (
 	"fmt"
 
-	eaglev1alpha1 "github.com/hmoghani/eagle/operator/api/v1alpha1"
+	eaglev1alpha1 "github.com/specgetti/eagle/operator/api/v1alpha1"
 )
 
 // Label keys and values shared by every resource the operator creates.

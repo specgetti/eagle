@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	eaglev1alpha1 "github.com/hmoghani/eagle/operator/api/v1alpha1"
+	eaglev1alpha1 "github.com/specgetti/eagle/operator/api/v1alpha1"
 )
 
 // requeueNotReady is used while waiting on things the operator does not watch

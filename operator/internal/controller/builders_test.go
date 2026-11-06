@@ -21,7 +21,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	eaglev1alpha1 "github.com/hmoghani/eagle/operator/api/v1alpha1"
+	eaglev1alpha1 "github.com/specgetti/eagle/operator/api/v1alpha1"
 )
 
 func newRP() *eaglev1alpha1.ReviewPlatform {

@@ -3,7 +3,7 @@ domain: redhat.com
 layout:
   - go.kubebuilder.io/v4
 projectName: eagle-operator
-repo: github.com/hmoghani/eagle/operator
+repo: github.com/specgetti/eagle/operator
 resources:
   - api:
       crdVersion: v1
@@ -12,6 +12,6 @@ resources:
     domain: redhat.com
     group: eagle
     kind: ReviewPlatform
-    path: github.com/hmoghani/eagle/operator/api/v1alpha1
+    path: github.com/specgetti/eagle/operator/api/v1alpha1
     version: v1alpha1
 version: "3"

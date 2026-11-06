@@ -1,4 +1,4 @@
-module github.com/hmoghani/eagle/operator
+module github.com/specgetti/eagle/operator
 
 go 1.24.0
 

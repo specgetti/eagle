@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	eaglev1alpha1 "github.com/hmoghani/eagle/operator/api/v1alpha1"
+	eaglev1alpha1 "github.com/specgetti/eagle/operator/api/v1alpha1"
 )
 
 const (
